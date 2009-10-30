@@ -1,0 +1,260 @@
+Patches applied to google_vendor_src_branch/gcc/gcc-4.2.1:
+
+gcc/Makefile.in
+gcc/c-common.c
+gcc/c-common.h
+gcc/c-opts.c
+gcc/c-typeck.c
+gcc/cp/typeck.c
+gcc/doc/invoke.texi
+gcc/flags.h
+gcc/opts.c
+gcc/tree-flow.h
+gcc/tree-ssa-alias-warnings.c
+gcc/tree-ssa-alias.c
+gcc/testsuite/g++.dg/warn/Wstrict-aliasing-7.C
+gcc/testsuite/g++.dg/warn/Wstrict-aliasing-bogus-base-derived.C
+gcc/testsuite/g++.dg/warn/Wstrict-aliasing-bogus-char-1.C
+gcc/testsuite/g++.dg/warn/Wstrict-aliasing-bogus-const.C
+gcc/testsuite/g++.dg/warn/Wstrict-aliasing-bogus-nested-arrays.C
+gcc/testsuite/g++.dg/warn/Wstrict-aliasing-bogus-signed-unsigned.C
+gcc/testsuite/g++.dg/warn/Wstrict-aliasing-bogus-struct-included.C
+gcc/testsuite/g++.dg/warn/Wstrict-aliasing-bogus-union.C
+gcc/testsuite/g++.dg/warn/Wstrict-aliasing-float-ref-int-obj.C
+gcc/testsuite/gcc.dg/Wstrict-aliasing-bogus-const-ptr-nonconst-ptr.c
+gcc/testsuite/gcc.dg/Wstrict-aliasing-bogus-never-dereferenced.c
+gcc/testsuite/gcc.dg/Wstrict-aliasing-bogus-struct-included.c
+gcc/testsuite/gcc.dg/Wstrict-aliasing-converted-assigned.c
+gcc/testsuite/gcc.dg/Wstrict-aliasing-float-ptr-int-obj.c
+gcc/testsuite/gcc.dg/alias-1.c
+gcc/testsuite/gcc.dg/alias-9.c
+  Backport of -Wstrict-aliasing from mainline.
+  Silvius Rus <rus@google.com>
+
+gcc/dwarf2out.c
+gcc/testsuite/g++.dg/debug/31899.C
+  Adds using-declaration ICE fix (PR 31899).
+  Doug Kwan <dougkwan@google.com>.
+
+gcc/tree-vrp.c:
+  Fix missed conversion from / to >> (PR 32521)
+  Diego Novillo <dnovillo@google.com>
+  Committed to mainline FSF.
+
+gcc/coverage.c:
+  Patch coverage_checksum_string for PR 25351.
+  Seongbae Park <spark@google.com>
+  Not yet submitted to FSF.
+
+gcc/c-opts.c
+gcc/c.opt
+gcc/cp/cp-lang.c
+gcc/cp/cp-tree.h
+gcc/cp/tree.c
+gcc/doc/invoke.texi
+gcc/dwarf2out.c
+gcc/flags.h
+gcc/langhooks-def.h
+gcc/langhooks.h
+gcc/opts.c
+gcc/testsuite/g++.dg/other/fesd-any.C
+gcc/testsuite/g++.dg/other/fesd-any.h
+gcc/testsuite/g++.dg/other/fesd-baseonly.C
+gcc/testsuite/g++.dg/other/fesd-baseonly.h
+gcc/testsuite/g++.dg/other/fesd-none.C
+gcc/testsuite/g++.dg/other/fesd-none.h
+gcc/testsuite/g++.dg/other/fesd-reduced.C
+gcc/testsuite/g++.dg/other/fesd-reduced.h
+gcc/testsuite/g++.dg/other/fesd-sys.C
+gcc/testsuite/g++.dg/other/fesd-sys.h
+gcc/testsuite/g++.dg/other/fesd.h
+gcc/testsuite/gcc.dg/fesd-any.c
+gcc/testsuite/gcc.dg/fesd-any.h
+gcc/testsuite/gcc.dg/fesd-baseonly.c
+gcc/testsuite/gcc.dg/fesd-baseonly.h
+gcc/testsuite/gcc.dg/fesd-none.c
+gcc/testsuite/gcc.dg/fesd-none.h
+gcc/testsuite/gcc.dg/fesd-reduced.c
+gcc/testsuite/gcc.dg/fesd-reduced.h
+gcc/testsuite/gcc.dg/fesd-sys.c
+gcc/testsuite/gcc.dg/fesd-sys.h
+gcc/testsuite/gcc.dg/fesd.h
+  Backport -femit-struct-debug support from gcc mainline.
+  Lawrence Crowl <crowl@google.com>.
+
+gcc/doc/cpp.texi
+gcc/testsuite/gcc.dg/cpp/counter-1.c
+gcc/testsuite/gcc.dg/pch/counter-1.c
+gcc/testsuite/gcc.dg/pch/counter-1.hs
+gcc/testsuite/gcc.dg/pch/counter-2.c
+gcc/testsuite/gcc.dg/pch/counter-2.hs
+gcc/testsuite/gcc.dg/pch/counter-3.c
+gcc/testsuite/gcc.dg/pch/counter-3.hs
+libcpp/include/cpplib.h
+libcpp/init.c
+libcpp/internal.h
+libcpp/macro.c
+libcpp/pch.c
+  Backport __COUNTER__ support from gcc mainline.
+  Ollie Wild <aaw@google.com>.
+
+gcc/c-common.c
+libcpp/files.c
+libcpp/internal.h
+libcpp/lex.c
+  Backport three preprocessor speedup patches from mainline.
+  Ian Lance Taylor <iant@google.com>.
+
+README.google
+gcc/c-opts.c
+gcc/c-ppoutput.c
+gcc/c.opt
+gcc/doc/cppopts.texi
+gcc/testsuite/gcc.dg/cpp/counter-2.c
+gcc/testsuite/gcc.dg/cpp/counter-3.c
+gcc/testsuite/gcc.dg/cpp/dir-only-1.c
+gcc/testsuite/gcc.dg/cpp/dir-only-1.h
+gcc/testsuite/gcc.dg/cpp/dir-only-2.c
+gcc/testsuite/gcc.dg/cpp/dir-only-3.c
+gcc/testsuite/gcc.dg/cpp/dir-only-3a.h
+gcc/testsuite/gcc.dg/cpp/dir-only-3b.h
+gcc/testsuite/gcc.dg/cpp/dir-only-4.c
+gcc/testsuite/gcc.dg/cpp/dir-only-5.c
+gcc/testsuite/gcc.dg/cpp/dir-only-6.c
+libcpp/Makefile.in
+libcpp/directives-only.c
+libcpp/directives.c
+libcpp/files.c
+libcpp/include/cpplib.h
+libcpp/init.c
+libcpp/internal.h
+libcpp/macro.c
+  Support for -fdirectives-only.
+  Ollie Wild <aaw@google.com>.
+  Submitted to FSF but not yet approved.
+
+README.google
+gcc/class/cp.c
+  http://b/737054
+  Nuke the warning for "anonymous namespace"
+  Not for upstream; they plan to fix the warning better in 4.3.X
+  Michael Chastain <mec@google.com>
+  copied from Seongbae Park <spark@google.com>
+
+README.google
+libstdc++-v3/include/ext/hashtable.h
+  http://b/742065
+  http://b/629994
+  Reduce min size of hashtable for hash_map, hash_set from 53 to 5
+
+README.google
+libstdc++-v3/include/ext/hashtable.h
+  http://b/629994
+  Do not iterate over buckets if hashtable is empty.
+
+README.google
+config/rs6000/rs6000.c
+  http://gcc.gnu.org/ml/gcc-patches/2007-04/msg01551.html
+  Don't set MASK_PPC_GFXOPT for 8540 or 8548.
+
+README.google
+gcc/c-decl.c
+gcc/c.opt
+gcc/cp/decl.c
+gcc/doc/invoke.texi
+gcc/testsuite/g++.dg/warn/Wvla-1.C
+gcc/testsuite/g++.dg/warn/Wvla-2.C
+gcc/testsuite/g++.dg/warn/Wvla-3.C
+gcc/testsuite/gcc.dg/wvla-1.c
+gcc/testsuite/gcc.dg/wvla-2.c
+gcc/testsuite/gcc.dg/wvla-3.c
+gcc/testsuite/gcc.dg/wvla-4.c
+gcc/testsuite/gcc.dg/wvla-5.c
+gcc/testsuite/gcc.dg/wvla-6.c
+gcc/testsuite/gcc.dg/wvla-7.c
+
+  Add -Wvla. Backport of a patch in pre-4.3.
+
+README.google
+gcc/cp/typeck.c
+  Backport of http://gcc.gnu.org/ml/gcc-patches/2007-01/msg00473.html
+  a patch for http://gcc.gnu.org/PR28986: warn about integer overflow
+  in constant expressions in the C++ frontend.
+
+README.google
+gcc/common.opt
+gcc/doc/invoke.texi
+gcc/flags.h
+gcc/gimplify.c
+gcc/opts.c
+  Add Saito's patch for -finstrument-functions-exclude-* options.
+
+README.google
+gcc/c-common.c #3 - edit (text)
+gcc/c-common.h #2 - edit (text)
+gcc/c-typeck.c #2 - edit (text)
+gcc/cp/cp-tree.h #5 - edit (text)
+gcc/cp/parser.c #3 - edit (text)
+gcc/cp/pt.c #3 - edit (text)
+gcc/cp/semantics.c #3 - edit (text)
+gcc/cp/typeck.c #4 - edit (text)
+gcc/doc/invoke.texi #4 - edit (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-10.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-11.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-12.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-13.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-14.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-15.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-16.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-17.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-18.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-19.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-20.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-21.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-22.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-23.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-24.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-5.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-6.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-7.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-8.C #1 - add (text)
+gcc/testsuite/g++.dg/warn/Wparentheses-9.C #1 - add (text)
+libstdc++-v3/ChangeLog #4 - edit (text)
+libstdc++-v3/include/bits/locale_facets.tcc #2 - edit (text)
+libstdc++-v3/include/bits/stl_tree.h #2 - edit (text)
+libstdc++-v3/include/bits/streambuf_iterator.h #2 - edit (text)
+libstdc++-v3/libsupc++/tinfo.cc #2 - edit (text)
+libstdc++-v3/src/locale.cc #2 - edit (text)
+libstdc++-v3/src/strstream.cc #2 - edit (text)
+libstdc++-v3/src/tree.cc #2 - edit (text)
+  Backport -Wparentheses (PR c++/19564)
+  http://gcc.gnu.org/ml/gcc-patches/2006-12/msg00868.html
+  http://gcc.gnu.org/ml/gcc-patches/2006-12/msg01772.html
+  http://gcc.gnu.org/ml/gcc-patches/2007-01/msg00545.html
+
+README.google
+gcc/common.opt
+gcc/doc/invoke.texi
+gcc/final.c
+gcc/flags.h
+gcc/opts.c
+gcc/testsuite/gcc.dg/Wframe-larger-than.c
+  Add a new flag -Wframe-larger-than- which enables a new warning
+  when a frame size of a function is larger than specified.
+  This patch hasn't been integrated into gcc mainline yet.
+
+README.google
+gcc/tree-vrp.c
+  Add a hack to avoid using ivopts information for pointers starting
+  at constant values.
+
+README.google
+gcc/cp/decl.c
+  Fix for gcc PR 33094: ICE with template static member in anonymous
+  namespace.
+
+README.google
+gcc/rtlanal.c
+gcc/postreload-gcse.c
+  Backport of the patch http://gcc.gnu.org/ml/gcc-patches/2007-05/msg01636.html
+  for bug 771329 and 821554.

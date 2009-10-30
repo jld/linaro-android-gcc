@@ -1,0 +1,21 @@
+# Just for these, we omit the frame pointer since it makes such a big
+# difference.  It is then pointless adding debugging.
+TARGET_LIBGCC2_CFLAGS = -fomit-frame-pointer -fPIC
+LIBGCC2_DEBUG_CFLAGS = -g0
+
+LIB1ASMSRC = arm/lib1funcs.asm
+LIB1ASMFUNCS = _udivsi3 _divsi3 _umodsi3 _modsi3 _dvmd_lnx _muldi3
+
+# These functions are present in both lib1funcs.asm and arm-libgcc2.c.  Only
+# one version of a function is built based on compilation time arch setting.
+LIB2FUNCS_EXTRA += $(srcdir)/config/arm/arm-libgcc2.c
+LIB2FUNCS_EXCLUDE += _clzdi2 _clzsi2
+LIB1ASMFUNCS += _clzdi2 _clzsi2
+
+# MULTILIB_OPTIONS = mhard-float/msoft-float
+# MULTILIB_DIRNAMES = hard-float soft-float
+
+# EXTRA_MULTILIB_PARTS = crtbegin.o crtend.o
+
+# LIBGCC = stmp-multilib
+# INSTALL_LIBGCC = install-multilib

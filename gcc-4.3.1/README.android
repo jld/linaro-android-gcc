@@ -1,0 +1,138 @@
+This is a customized gcc-4.3.1 for the Android platform.  It is based on the
+FSF gcc-4.3.1 release with the following modification listed in reversed
+chronological order.
+
+2009-04-21  Doug Kwan  <dougkwan@google.com>
+
+	Patch arm.md for gcc bug 40153.
+
+	http://gcc.gnu.org/viewcvs?view=rev&revision=147613
+
+	Changed File:
+
+	gcc/config/arm/arm.md
+
+2009-04-02  Doug Kwan  <dougkwan@google.com>
+
+	Bring 4.3.1 to the same set of patches as 4.2.1 and shave
+	1 instruction off aeabi_lmul.
+
+	Changed Files:
+
+	gcc/config/arm/eabi.h: Add -Bdynamic in linker spec.
+	Make "-fno-exceptions -fpic -fno-short-enums -mthumb-interwork"
+	default C flags.
+	gcc/config/arm/eabi.opt: Allow -mno-android.
+	gcc/config/arm/t-arm-elf: Add -mthumb-interwork and -mandroid
+	multilib options.
+	gcc/doc/invoke.texi: Document -mandroid.
+	gcc/gcc.c: Remove automatic -mandroid.
+	gcc/tree-ssa-structalias.c: Fix qsort instability.
+	gcc/lib1funcs.asm: Reduce one instruction from aeabi_lmul
+	and also handle cases for THUMB2 and older ARMs.
+	
+2009-02-20  Doug Kwan  <dougkwan@google.com>
+
+	Use -mandroid by default for arm-eabi.
+
+	Changed Files:
+
+	gcc/gcc.c
+
+2009-02-16  Doug Kwan  <dougkwan@google.com>
+
+	Port 2 patches from gcc-patches mailing list to fix NEON breakage.
+
+	http://gcc.gnu.org/ml/gcc-patches/2008-06/msg00085.html
+	http://gcc.gnu.org/ml/gcc-patches/2008-07/msg00134.html
+
+	Changed Files:
+
+	gcc/config/arm/arm.c
+
+2008-07-14  Doug Kwan  <dougkwan@google.com>
+
+	Port this patch from gcc-patches mailing list.
+
+	http://gcc.gnu.org/ml/gcc-patches/2008-07/msg01051.html
+
+	to implement Android specific behaviours in gcc, controllable
+	using a single -mandroid option of the arm*-*-eabi* targets.
+	The -mandroid option controls:
+
+	- names of startfile and endfile.
+	- list of standard C libraries (libc and, for dynamic
+	  executables, libdl)
+	- name of run-time linker (/system/bin/linker)
+	- Default C option (-fno-excetpions)
+	- Default C++ option (-fno-rtti)
+	- Standand define (__ANDROID__)
+	- Low level linker flags for -shared, -dynamic, -static and -rdynamic.
+
+	Changed Files:
+
+	gcc/config.gcc
+	gcc/config/arm/bpabi.h
+	gcc/config/arm/eabi.h
+	gcc/config/arm/eabi.opt
+	gcc/config/arm/elf.h
+	gcc/config/arm/unknown-elf.h
+
+2008-07-01  Doug Kwan  <dougkwan@google.com>
+
+	Port __aeabi_umul optimization patch from trunk.
+
+	http://gcc.gnu.org/ml/gcc-patches/2008-07/msg00057.html
+
+	The patch implements __aeabi_lmul in hand-optimized ARM assembly.
+
+	Changed file:
+
+	gcc/config/arm/lib1funcs.asm
+	gcc/config/arm/t-arm-coff
+	gcc/config/arm/t-arm-elf
+	gcc/config/arm/t-linux
+	gcc/config/arm/t-pe
+	gcc/config/arm/t-strongarm-elf
+	gcc/config/arm/t-symbian
+	gcc/config/arm/t-vxworks
+	gcc/config/arm/t-wince-pe
+
+2008-06-22  Doug Kwan  <dougkwan@google.com>
+
+	Back-port clz optimization patch
+
+	http://gcc.gnu.org/ml/gcc-patches/2008-06/msg00799.html
+
+	from trunk.  This is similar to the clz optimization patch in Android
+	gcc-4.2.1 but the patch has been modified by one of the ARM port
+	maintainers.  The back-ported patch has been slightly modified due to
+	difference between gcc-4.3.1 and trunk.
+
+2008-06-21  Doug Kwan  <dougkwan@google.com>
+
+	Fix code generation bug when both -fPIC and -fstack-fstack-protector
+	are given.  The is an associated gcc bug 36480 but the problem is
+	still not resolved in trunk.
+
+	Changed file:
+	
+	gcc/config/arm/arm.c
+
+2008-06-20  Doug Kwan  <dougkwan@google.com>
+
+	Apply the second patch in
+	http://gcc.gnu.org/ml/gcc-patches/2008-04/msg01577.html
+	to fix ICE in register renamer.
+
+	Changed file:
+
+	gcc/regrename.c
+
+2008-06-20  Doug Kwan  <dougkwan@google.com>
+
+	Apply part of the fix in bug 37156.
+
+	Changed file:
+
+	gcc/pretty-print.c
