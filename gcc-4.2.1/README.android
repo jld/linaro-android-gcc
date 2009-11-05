@@ -1,0 +1,208 @@
+This is a modified version of gcc-4.2.1 for Android. It is based on a Google
+customized gcc-4.2.1.  The Google specific changes are documented in 
+README.google.  In addition, this gcc also contains the following changes.
+
+2009-03-19  Doug Kwan  <dougkwan@google.com>
+
+	Fix two bugs that caused different code to be generated on Linux
+	and OSX.  Also took out automatic -mandroid and hack to preserve
+	output identity with previous gcc binaries.
+
+	Changed Files:
+
+	gcc/config/arm/t-arm-elf
+	gcc/gcc.c
+	gcc/tree-ssa-live.c
+	gcc/tree-ssa-live.h
+	gcc/tree-ssa-structalias.c
+	gcc/varasm.c
+
+2009-03-10  Doug Kwan  <dougkwan@google.com>
+
+	Build libgcc without -mno-android to match existing prebuilt gcc.
+	Add -fno-short-enums to -mandroind defaults.
+	Document -mandroid in gcc.info
+
+	Changed Files:
+
+        gcc/config/arm/eabi.h
+        gcc/config/arm/eabi.opt
+        gcc/config/arm/t-arm-elf        
+        gcc/doc/invoke.texi 
+
+2009-03-09  Doug Kwan  <dougkwan@google.com>
+
+	Add -fpic to -mandroid defaults.  Also hack varasm.c to match
+	behaviour of prebuilt gcc.
+
+	Changed Files:
+
+	gcc/config/arm/eabi.h
+	gcc/varasm.c
+
+2009-02-20  Doug Kwan  <dougkwan@google.com>
+
+	Use -mandroid by default on arm-eabi.
+	
+2009-01-29  Doug Kwan  <dougkwan@google.com>
+
+	Make -fpic default in -mandroid
+	Remove work-around in libiberty which is no longer required.
+
+	Changed Files:
+
+	gcc/config/arm/eabi.h
+	libiberty/lrealpath.c
+
+2009-01-14  Doug Kwan  <dougkwan@google.com>
+
+	Add support for libstdc++-v3 and shared run-time libraries.
+
+	Changed Files:
+
+	gcc/c-common.h
+	gcc/c-cppbuiltin.c
+	gcc/config/arm/t-arm-elf
+	libiberty/getpagesize.c
+	libiberty/lrealpath.c
+	libstdc++-v3/configure
+	libstdc++-v3/crossconfig.m4
+	libstdc++-v3/include/debug/formatter.h
+	libstdc++-v3/include/tr1/functional
+	libstdc++-v3/include/tr1/functional_iterate.h
+	libstdc++-v3/libsupc++/eh_arm.cc
+	libstdc++-v3/libsupc++/eh_call.cc
+	libstdc++-v3/libsupc++/eh_personality.cc
+	libstdc++-v3/libsupc++/tinfo.cc
+	libstdc++-v3/libsupc++/tinfo2.cc
+	libstdc++-v3/src/debug.cc
+	ltcf-c.sh
+	ltcf-cxx.sh
+	ltconfig
+
+2008-07-17  Doug Kwan  <dougkwan@google.com>
+
+	Propagate LDFLAGS at configuration time.
+
+	Changed Files:
+
+	Makefile.in
+
+2008-07-14  Doug Kwan  <dougkwan@google.com>
+
+	Port this patch from gcc-patches mailing list.
+
+	http://gcc.gnu.org/ml/gcc-patches/2008-07/msg01051.html
+
+	to implement Android specific behaviours in gcc, controllable
+	using a single -mandroid option of the arm*-*-eabi* targets.
+	The -mandroid option controls:
+
+	- names of startfile and endfile.
+	- list of standard C libraries (libc and, for dynamic
+	  executables, libdl)
+	- name of run-time linker (/system/bin/linker)
+	- Default C option (-fno-excetpions)
+	- Default C++ option (-fno-rtti)
+	- Standand define (__ANDROID__)
+	- Low level linker flags for -shared, -dynamic, -static and -rdynamic.
+
+	Changed Files:
+
+	gcc/config.gcc
+	gcc/config/arm/bpabi.h
+	gcc/config/arm/eabi.h
+	gcc/config/arm/eabi.opt
+	gcc/config/arm/elf.h
+	gcc/config/arm/unknown-elf.h
+
+2008-07-02  Doug Kwan  <dougkwan@google.com>
+
+	Fix PR 34922 to allow using --disable-libstdc__-v3.
+
+	http://gcc.gnu.org/ml/gcc-patches/2008-01/msg01029.html
+
+	Chnaged Files:
+
+	configure
+	configure.in
+
+2008-07-01  Doug Kwan  <dougkwan@google.com>
+
+	Port __aeabi_lmul optimization patch in
+
+	http://gcc.gnu.org/ml/gcc-patches/2008-07/msg00057.html
+
+	to gcc-4.2.1.
+
+	Changed Files:
+	
+	gcc/config/arm/lib1funcs.asm
+	gcc/config/arm/t-arm-coff
+	gcc/config/arm/t-arm-elf
+	gcc/config/arm/t-linux
+	gcc/config/arm/t-pe
+	gcc/config/arm/t-semi
+	gcc/config/arm/t-strongarm-elf
+	gcc/config/arm/t-strongarm-pe
+	gcc/config/arm/t-symbian
+	gcc/config/arm/t-wince-pe
+	gcc/config/arm/t-xscale-coff
+	gcc/config/arm/t-xscale-elf
+
+2008-06-19  Doug Kwan  <dougkwan@google.com>
+
+	* gcc/config/arm/t-arm-elf (MULTILIB_OPTIONS): Eanble
+	thumb-interwork multilib optins.
+	(MULTILIB_DIRNAMES): Likewise.
+
+2008-06-19  Doug Kwan  <dougkwan@google.com>
+
+	Back-port ARM stack unwinding from a newer gcc version than 4.2.1.
+	This is not needed for gcc-4.3.
+
+	Changed Files:
+
+	gcc/config/arm/libunwind.S
+	gcc/config/arm/libgcc-bpabi.ver
+	gcc/config/arm/unwind-arm.c
+	gcc/config/arm/unwind-arm.h
+
+2008-06-19  Doug Kwan  <dougkwan@google.com>
+
+	Enable decloning of constructors and destructors.  This is not
+	patchable to gcc-4.3.
+
+	Changed Files:
+
+	gcc/c.opt
+	gcc/cp/class.c
+	gcc/cp/cp-gimplify.c
+	gcc/cp/cp-tree.h
+	gcc/cp/semantics.c
+
+2008-06-19  Doug Kwan  <dougkwan@google.com>
+
+	CLZ optimization.  This is only required for gcc-4.2 and gcc-4.3.
+	The patch has been modified and accepted into gcc trunk and will
+	appear in gcc-4.4.
+
+	Changed Files:
+
+	gcc/config/arm/arm-libgcc2.c
+	gcc/config/arm/lib1funcs.asm
+	gcc/config/arm/t-arm-elf
+	gcc/config/arm/t-bpabi
+	gcc/config/arm/t-linux
+	gcc/config/arm/t-linux-eabi
+	
+2008-06-19  Doug Kwan  <dougkwan@google.com>
+
+	Stack protector bug fix.  The bug has not been fixed in gcc trunk
+	and this patch is required in 4.2, 4.3 and trunk.
+
+	Changed Files:
+
+	gcc/cfgrtl.c
+	gcc/config/arm/arm.c
+	gcc/rtl.h

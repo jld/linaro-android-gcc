@@ -1,0 +1,3 @@
+# Config mthumb-interwork multilib.
+MLOPT_mthumb_interwork	= mno-thumb-interwork/mthumb-interwork
+MLDIR_mthumb_interwork	= normal interwork

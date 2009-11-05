@@ -1,0 +1,1345 @@
+Patches applied to gcc-4.4.0:
+
+Please include a change to this file with each patch, *and* each
+subsequent modification of the patch.  Do NOT combine patch
+checkins, keep them separate.
+
+Append new entries to the end of this file. Each entry shall include:
+ * The list of files modified by the patch,
+ * The status of the patch (whether it's been checked in upstream,
+   or is a local patch),
+ * The local 'owner' responsible for the patch, and
+ * A description of the patch (preferably including bug numbers).
+
+Please include entries for both local patches and for patches which
+have been checked in to (or back-ported from) the upstream sources.
+When checking in changes made upstream, add an entry to this file but
+DO NOT add entries to the GNU ChangeLog files.
+
+gcc/Makefile.in
+gcc/configure
+gcc/configure.ac
+gcc/doc/install.texi
+  Added --with-native-system-header-dir to specify the location of
+  /usr/include instead of having it hard-coded.  This is especially useful
+  when building a sysroot'ed cross-compiler and you want to relocate
+  everything inside the system root.  Without this, the Makefile and
+  configure scripts assume system header files live in /usr/include (or in
+  usr/include under the system root directory).  This option is (partially)
+  overridden in the Makefile by targets whose makefile fragments define
+  NATIVE_SYSTEM_HEADER_DIR.  For those, the include searching done in
+  configure wasn't relevant or correct anyway.
+  Owner: cgd
+  Status: not yet upstream
+
+gcc/Makefile.in
+gcc/config/i386/linux.h
+gcc/config/i386/linux64.h
+gcc/config/linux.h
+gcc/configure
+gcc/configure.ac
+gcc/doc/install.texi
+  Added --with-runtime-root-prefix to specify a prefix to be added
+  to be beginning of paths used at runtime (e.g., the path to the
+  dynamic linker.
+  Owner: cgd
+  Status: not yet upstream
+
+libstdc++-v3/include/backward/hashtable.h
+  http://b/742065
+  http://b/629994
+  Reduce min size of hashtable for hash_map, hash_set from 53 to 5.
+  From Michael Chastain <mec@google.com>
+  Owner: iant
+  Status: upstream
+
+libstdc++-v3/include/backward/hash_map
+libstdc++-v3/include/backward/hash_set
+  Do not warn that these header files are deprecated.
+  Owner: iant
+  Status: local
+
+libstdc++-v3/include/backward/hashtable.h
+  http://b/629994
+  Do not iterate over buckets if hashtable is empty.
+  Michael Chastain <mec@google.com>
+  Owner: iant
+  Status: upstream
+
+gcc/config/i386/i386.c
+  Use __x86.get_pc_thunk rather than __i686.get_pc_thunk as the prefix
+  of 32-bit PC-getting thunk names to facilitate conversion of gcc -S
+  output into .S files.  (__i686 is defined as 1 by the preprocessor if
+  -mtune=pentiumpro or later is used.  If thunk names use __i686, then
+  when converting gcc -S output into .S files people need to replace
+  __i686 with some other string.)
+  Owner: cgd
+  Status: not yet upstream
+
+libstdc++-v3/include/backward/hashtable.h
+  Don't compare against deleted element when erasing from a hash
+  table.
+  Owner: iant
+  Status: upstream
+
+gcc/Makefile.in
+  Override date in pod2man invocation for reproducible builds.
+  Owner: cgd
+  Status: not yet upstream
+
+gcc/fortran/module.c
+  Don't include date in .mod files for reproducible builds.
+  Owner: cgd
+  Status: not yet upstream
+
+libstdc++-v3/acinclude.m4
+libstdc++-v3/libsupc++/Makefile.am
+libstdc++-v3/src/Makefile.am
+libstdc++-v3/Makefile.in
+libstdc++-v3/configure
+libstdc++-v3/doc/Makefile.in
+libstdc++-v3/include/Makefile.in
+libstdc++-v3/libsupc++/Makefile.in
+libstdc++-v3/po/Makefile.in
+libstdc++-v3/src/Makefile.in
+libstdc++-v3/testsuite/Makefile.in
+  In GLIBCXX_EXPORT_FLAGS (in acinclude.m4), substitute new variable
+  DETERMINISM_CXXFLAGS.  This variable uses -frandom-seed= to give each
+  object file a unique (but consistent) random seed, to enable deterministic
+  rebuilds.  Use this variable in src/Makefile.am and libsupc++/Makefile.am.
+  Regenerate the rest using autoconf and automake-1.9.
+  Owner: cgd
+  Status: not yet upstream
+
+gcc/doc/gcov.texi
+gcc/gcov.c
+  Adding a new option -i/--intermediate-format to gcov.
+  Originally CL 885 (also 11121) by Julie Wu <jwu@google.com>
+  Owner: nvachhar
+  Status: not yet upstream
+
+gcc/gcov-io.c
+  http://b/1302008
+  Do not open gcda/gcno files in write mode unnecessarily.
+  Owner: nvachhar
+  Status: not yet upstream
+
+gcc/config/i386/chkstk.asm
+gcc/config/i386/cygwin.asm
+gcc/config/i386/i386.c
+gcc/config/i386/i386.md
+gcc/config/i386/t-cygming
+gcc/config/i386/t-i386
+gcc/config/i386/t-interix
+  Implement stack probing for x86 by extending -mstack-arg-probe to work on
+  all x86 targets (it worked on only Windows x86 targets earlier).
+  Also, change the meaning of -fstack-check to mean -mstack-arg-probe on x86.
+  A similar patch was sent to the gcc-patches@ mailing list, only to be
+  rejected by Eric Botcazou because he claimed to have a superior
+  -fstack-check implementation in the works. So this patch will not be
+  submitted upstream. This google-local patch will become unnecessary when
+  Eric Botcazou's new -fstack-check implementation comes in (hopefully in
+  time for the next crosstools release).
+  Owner: raksit
+  Status: will not send upstream
+
+gcc/ifcvt.c
+  http://b/1301639
+  http://b/1345662
+  Blow away REG_EQUAL notes that become invalid after some instruction
+  movement transformations done by the if-conversion pass, while making
+  sure we don't try to remove REG_EQUAL notes from the same instruction
+  more than once.
+  Owner: raksit
+  Status: not yet upstream
+
+gcc/common.opt
+gcc/doc/invoke.texi
+gcc/dwarf2.h
+gcc/dwarf2out.c
+gcc/flags.h
+gcc/opts.c
+gcc/varasm.c
+  Add -gdwarf-4 option to enable use of COMDAT sections for debug type
+  information.
+  Owner: ccoutant
+  Status: in dwarf-4 branch upstream
+
+gcc/gcov.c
+  Fix a compilation issue in the gcov patch that caused bootstrapping to fail
+  due to an implicit cast from 'void *' to 'char *'.
+  Owner: lcwu
+  Status: not yet upstream
+
+gcc/Makefile.in
+gcc/basic-block.h
+gcc/common.opt
+gcc/ipa-inline.c
+gcc/ira-int.h
+gcc/mcf.c
+gcc/modulo-sched.c
+gcc/opts.c
+gcc/passes.c
+gcc/postreload-gcse.c
+gcc/predict.c
+gcc/profile.c
+gcc/profile.h
+gcc/regs.h
+gcc/sched-ebb.c
+gcc/sched-rgn.c
+gcc/timevar.def
+gcc/toplev.c
+gcc/toplev.h
+gcc/tracer.c
+gcc/tree-inline.c
+gcc/tree-pass.h
+gcc/tree-sample-profile.c
+gcc/tree-sample-profile.h
+  Port Sample FDO from GCC 4.3.1
+  Owner: nvachhar
+  Status: not yet upstream
+
+gcc/dbgcnt.def
+gcc/tree-ssa-ccp.c
+http://b/1698503
+Add debug count support for CCP pass (needed for 1698503 and is 
+generally useful).
+Owner: davidxl
+Status: not yet upstream
+
+gcc/config/i386/i386.c
+gcc/testsuite/gcc.dg/all_one_m128i.c
+Better instruction materializing all 1' m128i constant 
+without using RO memory.
+Owner: davidxl
+Status: not yet upstream
+
+gcc/cp/error.c
+gcc/c-pretty-print.c
+  Enhance GCC pretty-print/error-reporting mechanism to allow '%E' format
+  modifier to work with SSA names.
+  Owner: lcwu
+  Status: not yet upstream
+
+gcc/params.def
+gcc/builtins.c
+  Add a language-independent parameter "builtin-prefetch-override" to 
+  disable the code expansion for __builtin_prefetch().
+  Owner: nvachhar
+  Status: not yet upstream
+
+gcc/tree-ssa.c
+gcc/dominance.c
+gcc/ira-emit.c
+gcc/ira-int.h
+gcc/ira.c
+gcc/basic-block.h
+gcc/cfgrtl.c
+gcc/common.opt
+gcc/doc/invoke.texi
+gcc/testsuite/g++.dg/tree-ssa/dom-invalid.C
+   Fixed mustang runtime problem with -fprofile-use
+   Owner: davidxl
+   Status: not yet upstream
+
+gcc/tree-ssa-copy.c
+gcc/testsuite/g++.dg/tree-ssa/copyprop.C
+   Fixed compiler ICE with verify_ssa failure. 
+   Owner: davidxl
+   Status: not yet upstream
+
+gcc/ChangeLog.lock-annotations
+gcc/Makefile.in
+gcc/attribs.c
+gcc/c-common.c
+gcc/c-cppbuiltin.c
+gcc/c-decl.c
+gcc/c-parser.c
+gcc/common.opt
+gcc/cp/ChangeLog.lock-annotations
+gcc/cp/call.c
+gcc/cp/decl2.c
+gcc/cp/lex.c
+gcc/cp/parser.c
+gcc/cp/pt.c
+gcc/cp/semantics.c
+gcc/gimplify.c
+gcc/passes.c
+gcc/pointer-set.c
+gcc/pointer-set.h
+gcc/toplev.c
+gcc/toplev.h
+gcc/tree-pass.h
+gcc/tree-pretty-print.c
+gcc/tree-threadsafe-analyze.c
+gcc/tree-threadsafe-analyze.h
+gcc/tree.h
+gcc/testsuite/ChangeLog.lock-annotations
+gcc/testsuite/g++.dg/README
+gcc/testsuite/g++.dg/thread-ann/thread_annot_common.h
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-1.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-10.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-11.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-12.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-13.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-14.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-15.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-16.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-17.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-18.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-19.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-2.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-20.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-21.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-22.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-23.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-24.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-25.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-26.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-27.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-28.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-29.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-3.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-30.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-31.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-32.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-33.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-34.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-35.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-36.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-37.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-38.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-39.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-4.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-40.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-41.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-42.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-5.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-6.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-7.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-8.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-9.C
+gcc/testsuite/gcc.dg/thread_annot_common_c.h
+gcc/testsuite/gcc.dg/thread_annot_lock-23.c
+gcc/testsuite/gcc.dg/thread_annot_lock-24.c
+gcc/testsuite/gcc.dg/thread_annot_lock-25.c
+gcc/testsuite/gcc.dg/thread_annot_lock-26.c
+gcc/testsuite/gcc.dg/thread_annot_lock-27.c
+gcc/testsuite/gcc.dg/thread_annot_lock-42.c
+  Port the lock annotation/analysis support from the external GCC
+  thread-annotations branch (up to revision 144735).
+  Owner: lcwu
+  Status: in the GCC thread-annotations branch.
+
+ChangeLog.plugins
+Makefile.in
+Makefile.tpl
+configure
+configure.ac
+gcc/ChangeLog.plugins
+gcc/Makefile.in
+gcc/c-parser.c
+gcc/common.opt
+gcc/configure
+gcc/configure.ac
+gcc/cp/ChangeLog.plugins
+gcc/cp/Make-lang.in
+gcc/cp/decl.c
+gcc/cp/parser.c
+gcc/gcc-plugin.h
+gcc/opts.c
+gcc/passes.c
+gcc/plugin.c
+gcc/plugin.h
+gcc/toplev.c
+gcc/tree-pass.h
+  Port the plugin support from the external GCC 'plugins' branch to the
+  v13 tree. This CL contains GCC patch 144439 and 144758.
+  Owner: lcwu
+  Status: in the external GCC 'plugins' branch.
+
+gcc/configure.ac
+gcc/gcc.c
+gcc/configure
+gcc/config.in
+  Add --enable-linker-build-id configure flag, so linker build-id could
+  be turned on for all links.
+  Owner: ppluzhnikov
+  Status: committed upstream on 2009-04-30 as commits 147029 and 147031.
+
+gcc/ipa-cp.c
+gcc/profile.c
+    Tolerate insane profile data resulted from
+    multi-threaded programs.
+    Owner: davidxl
+    Status: not yet upstream
+
+gcc/value-prof.c
+    During indirect call promotion, filter out
+    obvious bad indirect call targets resulted
+    from race conditions during instrumented run.
+    Allowing such bad targets will lead to compiler
+    ICE.
+
+    Owner: davidxl
+    Status: not yet upstream
+
+gcc/value-prof.c
+  Fix a bug in gimple_stringop_fixed_value where it assumed all
+  stringops have 3 arguments, even though bzero only has two.
+  Owner: nvachhar
+  Status: not yet upstream
+  
+gcc/value-prof.c
+    Add TYPE_MODE check for icall target.
+    Owner: davidxl
+    Status: not yet upstream
+    
+libstdc++-v3/libsupc++/Makefile.am
+libstdc++-v3/libsupc++/Makefile.in
+libstdc++-v3/src/Makefile.am
+libstdc++-v3/src/Makefile.in
+  Add -fno-omit-frame-pointer to eh_throw.cc, eh_terminate.cc and
+  functexcept.cc compilation flags, so google3 frame-based unwinder
+  could work (this fixes //base:terminate_test failure).
+  Owner: ppluznikov
+  Status: google-local patch.
+
+gcc/tree-sample-profile.c
+    Fix a printf format problem which causes the bootstrap compiler
+    build to fail.
+    Owner: nvachhar
+    Status: not yet upstream
+
+gcc/Makefile.in
+gcc/tree-inline.c
+gcc/testsuite/gcc.dg/ipa/ipacost-1.c
+  Backport upstream mainline change 145126 for http://b/1735058.
+  This changes naming of cloned functions from e.g. T.1203()
+  to <some-properly-mangled-name>.clone.0().
+  Owner: ppluzhnikov
+  Status: in 4.5 mainline.
+
+gcc/coverage.c
+gcc/coverage.h
+gcc/gcc.c
+gcc/gcov-dump.c
+gcc/gcov-io.c
+gcc/gcov-io.h
+gcc/gcov.c
+gcc/libgcov.c
+gcc/profile.c
+gcc/tree.c
+gcc/tree.h
+  Profile data format change to tolerate source code changes.
+  This is not a backport, as the patch hasn't been submitted yet.
+  Owner: nvachhar
+  Status: not yet upstream
+
+gcc/coverage.c
+  http://b/1312568
+  Handle multiple globalization prefixes in a single string.
+  Owner: nvachhar
+  Status: not yet upstream
+
+gcc/ChangeLog.plugins
+gcc/testsuite/ChangeLog.plugins
+gcc/testsuite/g++.dg/README
+gcc/testsuite/g++.dg/dg.exp
+gcc/testsuite/g++.dg/plugin/dumb-plugin-test-1.C
+gcc/testsuite/g++.dg/plugin/dumb_plugin.c
+gcc/testsuite/g++.dg/plugin/plugin.exp
+gcc/testsuite/g++.dg/plugin/self-assign-test-1.C
+gcc/testsuite/g++.dg/plugin/self-assign-test-2.C
+gcc/testsuite/g++.dg/plugin/self-assign-test-3.C
+gcc/testsuite/g++.dg/plugin/selfassign.c
+gcc/testsuite/gcc.dg/plugin/plugin.exp
+gcc/testsuite/gcc.dg/plugin/self-assign-test-1.c
+gcc/testsuite/gcc.dg/plugin/self-assign-test-2.c
+gcc/testsuite/gcc.dg/plugin/selfassign.c
+gcc/testsuite/lib/plugin-support.exp
+gcc/testsuite/lib/target-supports.exp
+  Enhance the dejagnu infrastructure to support testing of the plugin
+  mechanism. Also add a couple of new plugin testcases.
+  Owner: lcwu
+  Status: in the external plugins branch (patch 145075 and 145458).
+
+Makefile.tpl
+configure
+configure.ac
+gcc/Makefile.in
+gcc/c-decl.c
+gcc/c-parser.c
+gcc/common.opt
+gcc/config.in
+gcc/configure
+gcc/configure.ac
+gcc/cp/Make-lang.in
+gcc/cp/decl.c
+gcc/cp/parser.c
+gcc/diagnostic.c
+gcc/doc/gccint.texi
+gcc/doc/invoke.texi
+gcc/doc/plugins.texi
+gcc/gcc-plugin.h
+gcc/gcc.c
+gcc/opts.c
+gcc/plugin-version.c
+gcc/plugin.c
+gcc/plugin.h
+gcc/testsuite/g++.dg/plugin/dumb_plugin.c
+gcc/testsuite/g++.dg/plugin/plugin.exp
+gcc/testsuite/g++.dg/plugin/selfassign.c
+gcc/testsuite/gcc.dg/plugin/plugin.exp
+gcc/testsuite/gcc.dg/plugin/selfassign.c
+gcc/testsuite/lib/plugin-support.exp
+gcc/timevar.def
+gcc/toplev.c
+  Merge all plugin patches from GCC mainline.  This includes SVN
+  revisions 146274, 146195, 146187, 146183, 146078 and 146059.
+  Owner: dnovillo
+  Status: In GCC mainline.
+
+gcc/c-format.c
+gcc/testsuite/gcc.dg/format/gcc_diag-1.c
+  Merge %E warning fix. Revision 146638.
+  Owner: espindola
+  Status: In GCC mainline.
+
+gcc/testsuite/g++.dg/init/copy7.C
+  Merge fix for a broken test.  Revision 146744.
+  Owner: dougkwan
+  Status: In GCC mainline.
+
+gcc/gcc.c
+  Pass --save-temps option to as to allow as to be replaced by a wrapper
+  that needs to know whether -save-temps was passed to gcc.
+  Owner: eraman
+  Status: local
+
+gcc/Makefile.in
+gcc/configure
+gcc/configure.ac
+gcc/gcc-plugin.h
+gcc/plugin.c
+  Owner: espindola
+  Status: In GCC mainline.
+  Change from using plugin-version.o to plugin-version.h. Revision 146962.
+
+doc/invoke.texi
+gcc/opts.c
+  Backport 147249.  Change location of debugging dumps to the output file
+  directory.
+  Owner: meheff
+  Status: In GCC mainline.
+
+gcc/config/arm/arm.c
+gcc/config/arm/lib1funcs.asm
+gcc/config/arm/t-arm-elf
+gcc/config/arm/t-linux
+gcc/config/arm/t-pe
+gcc/config/arm/t-strongarm-elf
+gcc/config/arm/t-symbian
+gcc/config/arm/t-vxworks
+gcc/config/arm/t-wince-pe
+  Implement 64-bit multiplication run-time function __aeabi_lmul in
+  hand optimized ARM code.
+  Owner: dougkwan
+  Status: Submitted upstream.
+
+gcc/cp/call.c
+gcc/cp/cvt.c
+gcc/cp/init.c
+gcc/testsuite/g++.dg/warn/Wunused-13.C
+gcc/testsuite/g++.dg/warn/Wunused-14.C
+gcc/testsuite/g++.dg/warn/Wunused-15.C
+  Fix an inconsistent behavior issue between C and C++ frontends with
+  '-Wunused-value' option. C++ frontend didn't warn on "effect-less"
+  indirect reference operations ('*'). (See http://b/issue?id=1725646)
+  This CL also contains the fix for http://b/issue?id=1795805 and fix
+  for PR c++/39875.
+  Owner: lcwu
+  Status: in 4.5 mainline at r146132, r146454, and r146825.
+
+gcc/testsuite/lib/plugin-support.exp
+gcc/testsuite/gcc.dg/plugin/selfassign.c
+gcc/testsuite/g++.dg/plugin/selfassign.c
+  Use the host compiler instead of the target compiler to build plugins in
+  the testsuite. (Ported from mainline patches r147197 and r147208.)
+  Also fix selfassign plugin to use the new version check header and API.
+  Owner: lcwu
+  Status: In 4.5 mainline.
+
+gcc/Makefile.in
+gcc/config.gcc
+  Install gcc headers.
+  Owner: espindola
+  Status: In GCC mainline at 147130, 147180.patch and 147244
+
+gcc/tree-ssa-loop-niter.c
+  Enhancement to iv bounds evaluation.
+  Owner: davidxl
+  Status: not in mainline yet.
+
+gcc/tree-ssa-sccvn.c
+  Stabilize qsort in scc_sort.
+  Owner: dougkwan
+  Status: In GCC mainline at 147508.
+
+gcc/config/arm/arm.md
+  Fix bug in thumb unsigned less comparison.
+  Owner: dougkwan
+  Status: in trunk at 147613, 4.3 branch at 147614 and 4.3 branch at 147626
+
+gcc/Makefile.in
+gcc/dbgcnt.def
+gcc/doc/invoke.texi
+gcc/params.def
+gcc/passes.c
+gcc/sbitmap.c
+gcc/sbitmap.h
+gcc/timevar.def
+gcc/tree-pass.h
+gcc/tree-ssa-lrs.c
+  Live range shrinking optimization
+  Owner: davidxl
+  Status: Not in GCC mainline
+
+gcc/Makefile.in
+  Fix tree-pass.h installation.
+  Owner: espindola
+  Status: local
+
+gcc/config/arm/eabi.h
+gcc/config/arm/eabi.opt
+gcc/config/arm/t-arm-elf
+gcc/doc/invoke.texi
+  Bring 4.4.0 to the same set of -mandroid options as Android 4.3.1.
+  Owner: jingyu
+  Status: not in mainline yet.
+
+gcc/Makefile.in
+gcc/alias.h
+gcc/basic-block.h
+gcc/c-decl.c
+gcc/c-lang.c
+gcc/c-opts.c
+gcc/c-tree.h
+gcc/cgraph.c
+gcc/cgraph.h
+gcc/cgraphbuild.c
+gcc/cgraphunit.c
+gcc/common.opt
+gcc/coverage.c
+gcc/coverage.h
+gcc/cp/Make-lang.in
+gcc/cp/cp-lang.c
+gcc/cp/cp-objcp-common.c
+gcc/cp/cp-tree.h
+gcc/cp/decl.c
+gcc/cp/decl2.c
+gcc/cp/friend.c
+gcc/cp/mangle.c
+gcc/cp/name-lookup.c
+gcc/cp/name-lookup.h
+gcc/cp/parser.c
+gcc/cp/pt.c
+gcc/cp/rtti.c
+gcc/cp/semantics.c
+gcc/dbgcnt.def
+gcc/doc/invoke.texi
+gcc/dwarf2out.c
+gcc/dyn-ipa.c
+gcc/except.c
+gcc/function.c
+gcc/function.h
+gcc/gcov-dump.c
+gcc/gcov-io.c
+gcc/gcov-io.h
+gcc/incpath.c
+gcc/incpath.h
+gcc/ipa-inline.c
+gcc/ipa.c
+gcc/l-ipo.c
+gcc/l-ipo.h
+gcc/langhooks-def.h
+gcc/langhooks.c
+gcc/langhooks.h
+gcc/libgcov.c
+gcc/opts.c
+gcc/opts.h
+gcc/params.def
+gcc/passes.c
+gcc/predict.c
+gcc/profile.c
+gcc/toplev.c
+gcc/toplev.h
+gcc/tree-inline.c
+gcc/tree-inline.h
+gcc/tree-pass.h
+gcc/tree-profile.c
+gcc/tree-sra.c
+gcc/value-prof.c
+gcc/value-prof.h
+gcc/varasm.c
+gcc/varpool.c
+libgcc/Makefile.in
+  LIPO implementation.
+  Ower: davidxl, raksit
+  Status: Not in mainline yet.
+
+gcc/Makefile.in
+gcc/doc/plugins.texi
+gcc/gcc-plugin.h
+gcc/testsuite/g++.dg/plugin/dumb_plugin.c
+gcc/testsuite/g++.dg/plugin/selfassign.c
+gcc/testsuite/gcc.dg/plugin/selfassign.c
+  Remove the need to pass -DIN_GCC when building plugins.
+  Owner: espindola
+  Status: In GCC mainline at 147908.
+
+gcc/basic-block.h
+gcc/config.in
+gcc/configure
+gcc/configure.ac
+gcc/dbxout.c
+gcc/debug.c
+gcc/debug.h
+gcc/dwarf2out.c
+gcc/final.c
+gcc/gimple-pretty-print.c
+gcc/sdbout.c
+gcc/tree-cfg.c
+gcc/vmsdbgout.c
+gcc/xcoffout.c
+  Add support for discriminators in the debug line number table.
+  Owner: ccoutant
+  Status: In GCC mainline at 148191.
+
+gcc/dwarf2out.c
+  Backport upstream fix for PR40350.
+  Add ATTRIBUTE_UNUSED to DISCRIMINATOR parameter of dwarf2out_source_line().
+  Owner: ccoutant
+  Status: In GCC mainline at 148206.
+
+gcc/testsuite/gcc.dg/tree-ssa/20080530.c
+  Fix test broken by the above LIPO implementation.
+  Owner: simonb
+  Status: Not in mainline yet.
+
+gcc/ifcvt.c
+gcc/optabs.c
+gcc/optabs.h
+  If-convert statements of the form 'if (val <0) valnot = ~val;'
+  Owner: eraman
+  Status: Not in mainline yet
+
+gcc/ipa-inline.c
+  Increase verbosity of inlining dumps.
+  Owner: meheff
+  Status: Will not push upstream.  Inliner changed significantly in 4.5.
+
+gcc/cfgloopmanip.c
+  Fix segfault when deleting paths during loop unrolling.
+  Owner: meheff
+  Status: Not in mainline yet.
+
+gcc/cfgcleanup.c
+gcc/cfglayout.c
+gcc/cfgrtl.c
+gcc/combine-stack-adj.c
+gcc/combine.c
+gcc/config/arm/arm.c
+gcc/config/bfin/bfin.md
+gcc/config/i386/i386.c
+gcc/config/i386/i386.h
+gcc/config/i386/i386.md
+gcc/config/vax/vax.c
+gcc/dwarf2out.c
+gcc/dwarf2out.h
+gcc/emit-rtl.c
+gcc/final.c
+gcc/function.c
+gcc/haifa-sched.c
+gcc/insn-notes.def
+gcc/jump.c
+gcc/reg-notes.def
+gcc/reload1.c
+gcc/rtl.def
+gcc/rtl.h
+gcc/rtlanal.c
+gcc/tree.h
+  Fixes for unwind info in function epilogues.
+  Owner: ppluzhnikov
+  Status: This is combination of (4.5) mainline changes 146201, 147995, 148066 and 148067.
+
+gcc/recog.c
+  Fix for failing gcc.target/i386/lea.c introduced by last checkin.
+  Owner: ppluzhnikov
+  Status: This is upstream (4.5) mainline change 148055.
+
+gcc/ifcvt.c:
+  Fix an uninitialized variable bug in noce_try_abs introduced by CL 29955.
+  Owner: eraman
+  Status: This change and CL 29955 will be pushed upstream.
+
+gcc/config/i386/i386.c
+  Fix for failing g++.dg/eh/async-unwind1.C introduced by mainline 147995,
+  and local CL 30117.
+  Owner: ppluzhnikov
+  Status: This is upstream (4.5) mainline change 148011.
+
+gcc/Makefile.in
+gcc/common.opt
+gcc/tree-pass.h
+gcc/passes.c
+gcc/timevar.def
+gcc/config/i386/i386.c
+gcc/implicit-zee.c
+  New optimization pass to eliminate redundant zero extenstion 
+  eliminations in x86_64.  Triggered by using -O2 in x86_64.
+  Owner: tmsriram
+  Status: Not yet upstream.
+
+gcc/config.gcc
+gcc/config/arm/t-arm-elf
+gcc/config/arm/t-mlib-armv7a
+gcc/config/arm/t-mlib-mandroid
+gcc/config/arm/t-mlib-mthumb-interwork
+  Add --with-multilib-list option for arm targets that include t-arm-elf file.
+  Owner: jingyu
+  status: not in mainline yet.
+
+gcc/ipa-inline.c
+gcc/passes.c
+gcc/testsuite/gcc.dg/tree-ssa/20080530.c
+gcc/tree-pass.h
+  Un-split the "einline1" and "einline2" passes into one "einline" pass,
+  similar to how it was before the LIPO checkin. Also, undo an earlier fix for
+  a failing gcc regression test submitted by simonb.
+  Owner: raksit
+  Status: This has been submitted upstream (in the lw-ipo branch).
+
+gcc/testsuite/gcc.dg/tree-prof/val-prof-7.c
+gcc/testsuite/gcc.dg/tree-ssa/ltrans-1.c
+gcc/testsuite/gcc.dg/tree-ssa/ltrans-3.c
+gcc/testsuite/gcc.dg/tree-ssa/ltrans-4.c
+gcc/testsuite/gcc.dg/tree-ssa/ltrans-5.c
+gcc/testsuite/gcc.dg/tree-ssa/ltrans-6.c
+gcc/testsuite/gcc.dg/tree-ssa/ltrans-8.c
+gcc/testsuite/gcc.dg/tree-ssa/vrp47.c
+gcc/testsuite/gfortran.dg/csqrt_2.f
+gcc/testsuite/gfortran.dg/ltrans-7.f90
+  Chronic failing tests marked locally as XFAIL, to permit the gcc continuous
+  build to scan for a clean sweep of testsuite tests.
+  Owner: simonb
+  Status: Not yet upstream.
+
+gcc/config/arm/arm.md
+gcc/config/arm/constraints.md
+  Optimization for addition of register and constant.
+  Owner: carrot
+  status: This is upstream (4.5) mainline change 148452.
+
+gcc/plugin.c
+  Include plugin-version.h only if ENABLE_PLUGIN is defined.
+  Owner: dnovillo
+  Status: Upstream in svn revision 146998.
+
+gcc/Makefile.in
+  Add plugins.texi to TEXI_GCCINT_FILES.
+  Owner: dnovillo
+  Status: Upstream in svn revision 147499.
+
+gcc/attribs.c
+gcc/doc/plugins.texi
+gcc/gcc-plugin.h
+gcc/plugin.c
+gcc/plugin.h
+gcc/testsuite/g++.dg/plugin/attribute_plugin-test-1.C
+gcc/testsuite/g++.dg/plugin/attribute_plugin.c
+gcc/testsuite/g++.dg/plugin/dumb_plugin.c
+gcc/testsuite/g++.dg/plugin/plugin.exp
+  Plugin backport of custom attributes registration.  This
+  contains a minor adjustment to compensate for front end
+  differences between mainline and v13.  In mainline, multiple
+  forward declarations of a function do not drop previously added
+  attributes.  It was simpler to adjust the test case rather than
+  the v13 parser.
+  Owner: dnovillo
+  Status: Upstream in svn revision 147516.
+
+gcc/doc/plugins.texi
+gcc/gcc-plugin.h
+gcc/plugin.c
+gcc/testsuite/g++.dg/plugin/attribute_plugin.c
+gcc/testsuite/g++.dg/plugin/dumb_plugin.c
+gcc/testsuite/g++.dg/plugin/selfassign.c
+gcc/testsuite/gcc.dg/plugin/selfassign.c
+  Plugin backport of new interface to plugin_init.
+  Owner: dnovillo
+  Status: Upstream in svn revision 147772.
+
+gcc/doc/plugins.texi
+gcc/testsuite/gcc.dg/plugin/ggcplug-test-1.c
+gcc/testsuite/gcc.dg/plugin/ggcplug.c
+gcc/testsuite/gcc.dg/plugin/plugin.exp
+gcc/ggc.h
+gcc/gcc-plugin.h
+gcc/ggc-common.c
+gcc/ggc-zone.c
+gcc/ggc-page.c
+gcc/plugin.c
+gcc/Makefile.in
+  Plugin backport of new plugin events for GGC.
+  Owner: dnovillo
+  Status: Upstream in svn revision 147878.
+
+gcc/testsuite/gcc.dg/plugin/ggcplug.c
+  Plugin backport of fixes for GGC support.
+  Owner: dnovillo
+  Status: Upstream in svn revision 148015.
+
+gcc/doc/plugins.texi
+gcc/doc/gty.texi
+gcc/gengtype.c
+  Plugin backport of new gengtype support for plugins using GGC.
+  Owner: dnovillo
+  Status: Upstream in svn revision 148515.
+
+gcc/testsuite/gcc.dg/plugin/plugin.exp
+gcc/testsuite/gcc.dg/plugin/one_time-test-1.c
+gcc/testsuite/gcc.dg/plugin/one_time_plugin.c
+gcc/plugin.c
+  Plugin backport of fix to avoid repeated insertion of passes.
+  Owner: dnovillo
+  Status: Upstream in svn revision 148566.
+
+gcc/doc/plugins.texi
+  Plugin backport of documentation on building plugins.
+  Owner: dnovillo
+  Status: Upstream in svn revision 148612.
+
+gcc/dbxout.c
+gcc/debug.c
+gcc/debug.h
+gcc/defaults.h
+gcc/dwarf2out.c
+gcc/final.c
+gcc/sdbout.c
+gcc/vmsdbgout.c
+gcc/xcoffout.c
+gcc/xcoffout.h
+  Backport of upstream fix for gdb testsuite regressions caused by
+  CL 29911-p2 (discriminators).
+  Owner: ccoutant
+  Status: In gcc mainline at 148635.
+
+gcc/ipa-inline.c
+  Add parameter to increase inlined function size limits when profile
+  information is available.   Also, increase not-declared-inline
+  function size limit to declared-inline function size limit.  Original
+  inlining behavior can be recreated with --param=max-inline-insns-auto=90
+  and --param=inline-limit-increase-with-profile=0.
+  Owner: meheff
+  Status: local
+
+gcc/config/arm/arm.md
+gcc/config/arm/constraints.md
+gcc/testsuite/gcc.target/arm/pr40482.c
+  Fix for failing to shift a small constant to get a larger one.
+  Owner: carrot
+  status: This is upstream (4.5) mainline change 148728.
+
+gcc/ipa-cp.c
+gcc/tree-ssa-loop.c
+  (1) Fix a bug in ipa-cp.
+  (2) The complete-unroll-innermost pass was triggered only at O3 or higher.
+      Enable it on -funroll-loops/-fpeel-loops as well (so that it gets
+      triggered even at O2 with FDO).
+  Owner: raksit
+  Status: (1) is already upstream. Will propose (2) upstream.
+ 
+gcc/testsuite/gcc.dg/matrix/matrix-1.c
+gcc/testsuite/gcc.dg/matrix/transpose-1.c
+gcc/testsuite/gcc.dg/matrix/transpose-2.c
+gcc/testsuite/gcc.dg/matrix/transpose-3.c
+gcc/testsuite/gcc.dg/matrix/transpose-4.c
+gcc/testsuite/gcc.dg/matrix/transpose-5.c
+gcc/testsuite/gcc.dg/matrix/transpose-6.c
+  Fix regression failure due to changing inlining heuristics.
+  Owner: meheff
+  Status: local (exposed by local patch 30664-p2).
+
+gcc/opts.c
+gcc/doc/invoke.texi
+  Change the default behavior of -ftracer with FDO. Now it is off with -fprofile-use.
+  The old behavior can be restored with -fprofile-use -ftracer.
+  Owner: singhai
+  Status: local
+
+gcc/config/i386/i386.c
+gcc/config/i386/i386.md
+gcc/config/i386/i386.opt
+gcc/doc/invoke.texi
+  Adds the flag -minline-compares. If flag is not given, strcmp and memcmp are
+  not inlined.
+  Owner: martint
+  Status: Not yet upstream.
+
+gcc/ifcvt.c
+  Optimization for conditional expression.
+  Owner: carrot
+  Status: This is upstream (4.5) mainline change 148961.
+
+gcc/doc/invoke.texi
+gcc/loop-unroll.c
+gcc/params.def
+gcc/tree-ssa-loop-ivcanon.c
+  Add parameter to control loop peeling/unrolling when profile feedback information is
+  available.
+  Owner: singhai
+  Status: local
+
+gcc/tree-ssa-sink.c
+gcc/testsuite/gcc.dg/tree-ssa/ssa-sink-5.c
+  Stop sinking expression if the target bb post dominates from bb.
+  Owner: carrot
+  Status: This is upstream (4.5) mainline change 149082.
+
+gcc/testsuite/gcc.dg/vect/vect.exp
+gcc/testsuite/gcc.dg/vect/O3-vect-pr34223.c
+  Fix a test failure due to peeling parameter change.
+  Owner: singhai
+  Status: local
+
+gcc/testsuite/gcc.dg/20050503-1.c
+  Fixed regression failure exposed by 30803-p2. The flag -minline-compares is
+  now needed to trigger the inlining expected in the test.
+  Owner: martint
+  Status: Not yet upstream.
+
+libstdc++-v3/include/bits/stl_vector.h
+libstdc++-v3/include/ext/sso_string_base.h
+libstdc++-v3/include/ext/vstring.h
+  Various debug checks, controlled by
+  __google_stl_debug_{vector,string} macros.
+  Owner : ppluzhnikov
+  Status: local.
+
+libstdc++-v3/include/bits/stl_algo.h
+libstdc++-v3/include/bits/stl_tree.h
+  Check for strict weak ordering, controlled by
+  __google_stl_debug_{rbtree,compare} macros.
+  Owner: ppluzhnikov
+  Status: local
+
+gcc/dwarf2out.c
+  Apply upstream fix for http://b/1949954
+  Owner: ppluzhnikov
+  Status: This is upstream (4.5) mainline change 149235.
+
+gcc/testsuite/gcc.dg/tree-prof/val-prof-7.c
+  Fix test so that it works on x86 and x86_64.  Remove XFAIL since the
+  test passes and is supposed to pass.
+  Owner: nvachhar
+  Status: Not yet upstream.
+
+gcc/testsuite/gcc.dg/tree-prof/val-prof-7.c
+  Fix test so that it works regardless of mtune settings.
+  Owner: nvachhar
+  Status: Not yet upstream.
+
+gcc/config/arm/arm.h
+  Backport upstream fix that add PACK support to arm platforms.
+  Owner: jingyu
+  Status: This is upstream (4.5) mainline change 146629.
+
+gcc/testsuite/gcc.dg/tls/alias-1.c
+gcc/testsuite/gcc.dg/tls/opt-2.c
+  Backport upstream patch that fixes the two dejagnu failures when the TLS
+  symbol is missing in the C library.
+  Owner: jingyu
+  Status: This is upstream (4.5) mainline change 146913.
+
+gcc/config/rs6000/rs6000.c
+  Fix for http://b/1836944
+  Owner: dnovillo
+  Status: In GCC 4.5 as of rev 148568.
+
+gcc/Makefile.in
+gcc/ada/gcc-interface/Make-lang.in
+gcc/configure
+gcc/configure.ac
+gcc/cp/Make-lang.in
+gcc/doc/sourcebuild.texi
+gcc/fortran/Make-lang.in
+gcc/java/Make-lang.in
+gcc/objc/Make-lang.in
+gcc/objcp/Make-lang.in
+gcc/testsuite/g++.dg/plugin/plugin.exp
+gcc/testsuite/g++.dg/plugin/header-plugin-test.C
+gcc/testsuite/g++.dg/plugin/header_plugin.c
+  Backport of SVN revisions 148783, 148806, 149100, 149313 and
+  149648.  Build harness changes needed for dehydra.
+  Owner: dnovillo
+  Status: In GCC 4.5 at the revisions mentioned above.
+
+gcc/doc/plugins.texi
+gcc/gcc-plugin.h
+gcc/plugin.c
+gcc/testsuite/gcc.dg/plugin/plugin.exp
+gcc/testsuite/gcc.dg/plugin/start_unit-test-1.c
+gcc/testsuite/gcc.dg/plugin/start_unit_plugin.c
+gcc/toplev.c
+  Backport of SVN revision 149064.  Add PLUGIN_START_UNIT event.
+  Owner: dnovillo
+  Status: In GCC 4.5 at revision 149064.
+
+gcc/testsuite/gcc.dg/plugin/start_unit_plugin.c
+  Adapt call to build_decl to conform to GCC 4.4 API.
+  Owner: dnovillo
+  Status: Local.  Not needed upstream.
+
+gcc/gcc.c
+gcc/doc/invoke.texi
+  Backport --no-canonical-prefixes to gcc to bypass realpath() when making
+  exec and other prefixes from argv[0].
+  Owner: simonb
+  Status: Committed upstream for gcc 4.5 (trunk, mainline) as revision 149702.
+
+gcc/coverage.c
+gcc/dyn-ipa.c
+gcc/gcov-io.c
+gcc/gcov-io.h
+gcc/libgcov.c
+gcc/value-prof.c
+  Several LIPO bug-fixes:
+  (1) http://b/1987785 : Fix a memory leak.
+  (2) http://b/1980564 : Don't icall-promote auxiliary ARTIFICIALs.
+  (3) http://b/1980550 : Fix how we detect FDO/LIPO at gcov_exit time.
+  (4) http://b/1980493 : Fix a profile merging bug (truncate gcda file).
+  (5) http://b/1980436 : Make some global data/functions in libgcov hidden.
+  Owner: raksit
+  Status: This is committed in the upstream lipo branch as revision 149786.
+
+gcc/dbgcnt.c
+  Fix a bug in debug counter name parsing
+  Owner: davidxl
+  Status: submitted upstream
+
+gcc/ipa-inline.c
+  inline info dump enhancement. dbg count support for ipa-inline.
+  Owner: davidxl
+  Status: submitted upstream (lw-ipo branch)
+
+gcc/tree-ssa-lrs.c
+  fix a bug in negate statement insertion
+  Owner: davidxl
+  Status: not submitted
+
+gcc/tree-inline.c
+  correct handling of vararg call size esimitate
+  Owner: davidxl
+  Status: submitted upstream (lw-ipo branch)
+
+gcc/loop-iv.c
+  Call df_note_add_problem in iv_analysis_loop_init since loop-iv
+  calls single_set which depends on the notes being correct.
+  Owner: nvachhar
+  Status: submitted upstream
+
+gcc/testsuite/gcc.misc-tests/linkage.exp
+  Backport SVN revision 149997.  Fixes the test where the built gcc is 64-bit
+  but the platform C compiler defaults to 32-bit compilation.
+  Owner: simonb
+  Status: In gcc 4.5 at revision 149997.
+
+gcc/Makefile.in
+gcc/common.opt
+gcc/doc/invoke.texi
+gcc/passes.c
+gcc/rtl-factoring.c
+gcc/testsuite/gcc.c-torture/compile/pr11832.c
+gcc/testsuite/gcc/c-torture/compile/pr33009.c
+  Backport SVN revision 145374.  Eliminate abstract RTL sequences related
+  code and test cases.
+  Owner: dougkwan
+  Status: In gcc 4.5 at revision 145374.
+
+gcc/l-ipo.c
+  Symbol binding update for promoted statics.
+  Owner: davidxl
+  Status: submitted to upstream (lw-ipo branch).
+
+gcc/config/arm/arm.md
+  Backport of SVN versions 147612 and 149951 to fix ICE in 64-bit add and
+  subtract in thumb mode.
+  Owner: dougkwan
+  Status: In GCC 4.5 at the revisions mentioned above.
+
+gcc/testsuite/gcc.dg/20050503-1.c
+  Use -minline-compares only on x86 and x86_64 targets.  This fixes 
+  breakage on non-x86 targets due to a previous Google local change in test.
+  Owner: dougkwan
+  Status: Not yet upstream.
+
+gcc/testsuite/gcc.dg/tree-prof/bb-reorg.c
+gcc/testsuite/gcc.dg/tree-prof/pr34999.c
+  Chronic failing tests marked locally as ilp32-only, to permit the gcc
+  continuous build to scan for a clean sweep of testsuite tests.  Ideally
+  these tests would be marked XFAIL, but XFAIL functionality is not currently
+  supported by the code that drives these tests.
+  Owner: simonb
+  Status: Local.  Not needed upstream.
+
+testsuite/gcc.dg/vect/no-scevccp-noreassoc-outer-2.c
+  Backport SVN revision 150109.  The array index can run off the end of array
+  'a', leading to (unpredictable) segv.
+  Owner: simonb
+  Status: In gcc 4.5 at revision 150109.
+
+gcc/cfghooks.c
+gcc/tree-cfg.c
+  Backport upstream patch to improve discriminator assignment:
+  http://gcc.gnu.org/ml/gcc-patches/2009-07/msg01450.html
+  Owner: ccoutant
+  Status: In gcc trunk at revision 150068.
+
+gcc/testsuite/gcc.target/arm/neon/polytypes.c
+  Backport of SVN versions 150287 to fix test.
+  Owner: dougkwan
+  Status: In GCC 4.5 at the revisions mentioned above.
+
+gcc/cp/cp-objcp-common.c
+  Fix for issue 2021600
+  Owner: davidxl
+  Status: submitted to lw-ipo branch
+
+gcc/tree-inline.c
+gcc/cfg.c
+  Fix for 2024712
+  Owner: davidxl
+  Status: not submitted.
+
+gcc/coverage.c
+gcc/incpath.h
+gcc/incpath.c
+  Fix for issue 2021675
+  Owner: davidxl
+  Status: submitted to lw-ipo branch
+
+gcc/tree-ssa-ccp.c
+  Fix for issue 2029087
+  Owner: davidxl
+  Status: backported from trunk r146592.
+
+gcc/tree-inline.c
+gcc/cfg.c
+  Formating change.
+  Owner: davidxl
+  Status: not submitted.
+
+gcc/tree-ssa.c
+  Fix false uninitialized warning on empty struct
+  Owner: davidxl
+  Status: not submitted.
+
+gcc/gcov.c
+  Add intermediate format for branch coverage as requested by krishnakg.
+  Owner: nvachhar
+  Status: Not yet upstream.
+
+ChangeLog
+gcc/value-prof.c
+  Initialize pid_map using XCNEWVEC (rather than malloc) to make the
+  compiler robust to bad profile data.
+  Owner: nvachhar
+  Status: In gcc 4.5 at revision 150544
+
+gcc/c-opts.c
+  Fix 2041454:
+  Cleanup deferred options after primary module parsing.
+  Owner: davidxl
+  Status: submitted upstream. (lw-ipo)
+
+gcc/gcc.c
+  Fix 2031001.
+  Don't search /usr/libexec/gcc and /usr/lib/gcc.
+  Owner: espindola
+  Status: Being reviewed upstream.
+
+gcc/cgraph.h
+gcc/common.opt
+gcc/ipa-inline.c
+gcc/params.def
+  Pessimize stack accounting during inlining, and change maximum frame size
+  to 16K.  Previous stack frame accounting behavior can be re-enabled
+  with:
+     -fno-pessimistic-inline-stack-limit --param=large-stack-frame=256 \
+     --param=large-stack-frame-growth=1000
+
+  Owner: meheff
+  Status: Not yet upstream.
+ 
+gcc/gimple-low.c
+gcc/value-prof.c
+gcc/tree-flow.c
+  Fix to 1968655
+  Owner: davidxl
+  Status: a different but equivalent patch will be sent upstream for 
+  trunk.
+
+gcc/tree-profile.c
+gcc/libgcov.c
+  Uses existing option to control whether the middle-end and target use
+  TLS or not.
+  Owner: jingyu
+  Status: not yet upstream
+
+gcc/cp/pt.c
+gcc/testsuite/g++.dg/ext/vla7.C
+  Fix for issue 1992085
+  Owner: eraman
+  Status: Backported from upstream revision 147119.
+
+gcc/dwarf2out.c
+gcc/testsuite/g++.dg/debug/dwarf2/nested-1.C
+  Apply upstream change 147674:
+    2009-05-18  Dodji Seketeli  <dodji@redhat.com>
+          PR debug/40109
+          * dwarf2out.c (gen_type_die_with_usage): Generate the DIE as a
+          child of the containing namespace's DIE.
+  Owner: ppluzhnikov
+  Status: Backported from upstream rev. 147674.
+
+gcc/cfgexpand.c
+gcc/config/i386/i386-protos.h
+gcc/config/i386/i386.c
+gcc/config/i386/i386.h
+gcc/defaults.h
+gcc/doc/tm.texi
+gcc/emit-rtl.c
+gcc/function.c
+  Apply usptream change 149513:
+   2009-07-11  Jakub Jelinek  <jakub@redhat.com>
+      PR rtl-optimization/40667
+      * defaults.h (MINIMUM_ALIGNMENT): Define if not defined.
+      * doc/tm.texi (MINIMUM_ALIGNMENT): Document it.
+      * config/i386/i386.h (MINIMUM_ALIGNMENT): Define.
+      * config/i386/i386.c (ix86_minimum_alignment): New function.
+      * config/i386/i386-protos.h (ix86_minimum_alignment): New prototype.
+      * cfgexpand.c (expand_one_var): Use MINIMIM_ALIGNMENT.
+      * emit-rtl.c (gen_reg_rtx): Likewise.
+      * function.c (assign_parms): Likewise.  If nominal_type needs
+      bigger alignment than FUNCTION_ARG_BOUNDARY, use its alignment
+      rather than passed_type's alignment.
+  Owner: ppluzhnikov
+  Status: Backported from upstream rev. 149513.
+
+gcc/dwarf2out.c
+  Fix for issue 1890034 -- check for nested types inside types not
+  broken out; make sure that copied DIEs are visited when copying
+  "unworthy" types.
+  Owner: ccoutant
+  Status: backported from dwarf-4 branch at revision 150574.
