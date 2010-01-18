@@ -119,8 +119,7 @@ phivn_valid_p (struct phiprop_d *phivn, tree name, basic_block bb)
       FOR_EACH_IMM_USE_STMT (use_stmt, ui2, vuse)
 	{
 	  /* If BB does not dominate a VDEF, the value is invalid.  */
-	  if (((is_gimple_assign (use_stmt)
-	        && !ZERO_SSA_OPERANDS (use_stmt, SSA_OP_VDEF))
+	  if ((!ZERO_SSA_OPERANDS (use_stmt, SSA_OP_VDEF)
 	       || gimple_code (use_stmt) == GIMPLE_PHI)
 	      && !dominated_by_p (CDI_DOMINATORS, gimple_bb (use_stmt), bb))
 	    {
@@ -161,14 +160,17 @@ phiprop_insert_phi (basic_block bb, gimple phi, gimple use_stmt,
     {
       tree old_arg, new_var;
       gimple tmp;
+      source_location locus;
 
       old_arg = PHI_ARG_DEF_FROM_EDGE (phi, e);
+      locus = gimple_phi_arg_location_from_edge (phi, e);
       while (TREE_CODE (old_arg) == SSA_NAME
 	     && (SSA_NAME_VERSION (old_arg) >= n
 	         || phivn[SSA_NAME_VERSION (old_arg)].value == NULL_TREE))
 	{
 	  gimple def_stmt = SSA_NAME_DEF_STMT (old_arg);
 	  old_arg = gimple_assign_rhs1 (def_stmt);
+	  locus = gimple_location (def_stmt);
 	}
 
       if (TREE_CODE (old_arg) == SSA_NAME)
@@ -187,6 +189,7 @@ phiprop_insert_phi (basic_block bb, gimple phi, gimple use_stmt,
 	  add_referenced_var (new_var);
 	  new_var = make_ssa_name (new_var, tmp);
 	  gimple_assign_set_lhs (tmp, new_var);
+	  gimple_set_location (tmp, locus);
 
 	  gsi_insert_on_edge (e, tmp);
 
@@ -194,7 +197,7 @@ phiprop_insert_phi (basic_block bb, gimple phi, gimple use_stmt,
 	  mark_symbols_for_renaming (tmp);
 	}
 
-      add_phi_arg (new_phi, new_var, e);
+      add_phi_arg (new_phi, new_var, e, locus);
     }
 
   update_stmt (new_phi);

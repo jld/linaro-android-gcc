@@ -8343,6 +8343,19 @@ build_binary_op (location_t location, enum tree_code code,
 	{
 	  tree tt0 = TREE_TYPE (type0);
 	  tree tt1 = TREE_TYPE (type1);
+	  if (TREE_CODE (op0) == ADDR_EXPR
+	      && TREE_CODE (TREE_OPERAND (op0, 0)) == FUNCTION_DECL)
+	      warning_at (location,
+			  OPT_Wicf,
+			  "Function pointer used in comparison : %qD",
+			  TREE_OPERAND (op0, 0));
+	  if (TREE_CODE (op1) == ADDR_EXPR
+	      && TREE_CODE (TREE_OPERAND (op1, 0)) == FUNCTION_DECL)
+	      warning_at (location,
+			  OPT_Wicf,
+			  "Function pointer used in comparison : %qD",
+			  TREE_OPERAND (op1, 0));
+
 	  /* Anything compares with void *.  void * compares with anything.
 	     Otherwise, the targets must be compatible
 	     and both must be object or both incomplete.  */

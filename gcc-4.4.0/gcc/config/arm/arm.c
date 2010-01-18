@@ -126,6 +126,7 @@ static bool arm_function_ok_for_sibcall (tree, tree);
 static void arm_internal_label (FILE *, const char *, unsigned long);
 static void arm_output_mi_thunk (FILE *, tree, HOST_WIDE_INT, HOST_WIDE_INT,
 				 tree);
+static bool arm_have_conditional_execution (void);
 static bool arm_rtx_costs_1 (rtx, enum rtx_code, int*, bool);
 static bool arm_size_rtx_costs (rtx, enum rtx_code, enum rtx_code, int *);
 static bool arm_slowmul_rtx_costs (rtx, enum rtx_code, enum rtx_code, int *, bool);
@@ -367,6 +368,9 @@ static bool arm_allocate_stack_slots_for_args (void);
 #undef TARGET_HAVE_TLS
 #define TARGET_HAVE_TLS true
 #endif
+
+#undef TARGET_HAVE_CONDITIONAL_EXECUTION
+#define TARGET_HAVE_CONDITIONAL_EXECUTION arm_have_conditional_execution
 
 #undef TARGET_CANNOT_FORCE_CONST_MEM
 #define TARGET_CANNOT_FORCE_CONST_MEM arm_cannot_force_const_mem
@@ -5589,6 +5593,121 @@ arm_rtx_costs_1 (rtx x, enum rtx_code outer, int* total, bool speed)
     }
 }
 
+/* Estimates the size cost of thumb1 instructions.
+   For now most of the code is copied from thumb1_rtx_costs. We need more
+   fine grain tuning when we have more related test cases.  */
+static inline int
+thumb1_size_rtx_costs (rtx x, enum rtx_code code, enum rtx_code outer)
+{
+  enum machine_mode mode = GET_MODE (x);
+
+  switch (code)
+    {
+    case ASHIFT:
+    case ASHIFTRT:
+    case LSHIFTRT:
+    case ROTATERT:
+    case PLUS:
+    case MINUS:
+    case COMPARE:
+    case NEG:
+    case NOT:
+      return COSTS_N_INSNS (1);
+
+    case MULT:
+      if (GET_CODE (XEXP (x, 1)) == CONST_INT)
+        {
+          /* Thumb1 mul instruction can't operate on const. We must Load it
+             into a register first.  */
+          int const_size = thumb1_size_rtx_costs (XEXP (x, 1), CONST_INT, SET);
+          return COSTS_N_INSNS (1) + const_size;
+        }
+      return COSTS_N_INSNS (1);
+
+    case SET:
+      return (COSTS_N_INSNS (1)
+              + 4 * ((GET_CODE (SET_SRC (x)) == MEM)
+                     + GET_CODE (SET_DEST (x)) == MEM));
+
+    case CONST_INT:
+      if (outer == SET)
+        {
+          if ((unsigned HOST_WIDE_INT) INTVAL (x) < 256)
+            return 0;
+          if (thumb_shiftable_const (INTVAL (x)))
+            return COSTS_N_INSNS (2);
+          return COSTS_N_INSNS (3);
+        }
+      else if ((outer == PLUS || outer == COMPARE)
+               && INTVAL (x) < 256 && INTVAL (x) > -256)
+        return 0;
+      else if ((outer == IOR || outer == XOR || outer == AND)
+               && INTVAL (x) < 256 && INTVAL (x) >= -256)
+        return COSTS_N_INSNS (1);
+      else if (outer == ASHIFT || outer == ASHIFTRT
+               || outer == LSHIFTRT)
+        return 0;
+      return COSTS_N_INSNS (2);
+
+    case CONST:
+    case CONST_DOUBLE:
+    case LABEL_REF:
+    case SYMBOL_REF:
+      return COSTS_N_INSNS (3);
+
+    case UDIV:
+    case UMOD:
+    case DIV:
+    case MOD:
+      return 100;
+
+    case TRUNCATE:
+      return 99;
+
+    case AND:
+    case XOR:
+    case IOR:
+      /* XXX guess.  */
+      return 8;
+
+    case MEM:
+      /* XXX another guess.  */
+      /* Memory costs quite a lot for the first word, but subsequent words
+         load at the equivalent of a single insn each.  */
+      return (10 + 4 * ((GET_MODE_SIZE (mode) - 1) / UNITS_PER_WORD)
+              + ((GET_CODE (x) == SYMBOL_REF && CONSTANT_POOL_ADDRESS_P (x))
+                 ? 4 : 0));
+
+    case IF_THEN_ELSE:
+      /* XXX a guess.  */
+      if (GET_CODE (XEXP (x, 1)) == PC || GET_CODE (XEXP (x, 2)) == PC)
+        return 14;
+      return 2;
+
+    case ZERO_EXTEND:
+      /* XXX still guessing.  */
+      switch (GET_MODE (XEXP (x, 0)))
+        {
+        case QImode:
+          return (1 + (mode == DImode ? 4 : 0)
+                  + (GET_CODE (XEXP (x, 0)) == MEM ? 10 : 0));
+
+        case HImode:
+          return (4 + (mode == DImode ? 4 : 0)
+                  + (GET_CODE (XEXP (x, 0)) == MEM ? 10 : 0));
+
+        case SImode:
+          return (1 + (GET_CODE (XEXP (x, 0)) == MEM ? 10 : 0));
+
+        default:
+          return 99;
+        }
+
+    default:
+      return 99;
+    }
+}
+
 /* RTX costs when optimizing for size.  */
 static bool
 arm_size_rtx_costs (rtx x, enum rtx_code code, enum rtx_code outer_code,
@@ -5597,8 +5716,7 @@ arm_size_rtx_costs (rtx x, enum rtx_code code, enum rtx_code outer_code,
   enum machine_mode mode = GET_MODE (x);
   if (TARGET_THUMB1)
     {
-      /* XXX TBD.  For now, use the standard costs.  */
-      *total = thumb1_rtx_costs (x, code, outer_code);
+      *total = thumb1_size_rtx_costs (x, code, outer_code);
       return true;
     }
 
@@ -19712,6 +19830,14 @@ arm_optimization_options (int level, int size ATTRIBUTE_UNUSED)
      given on the command line.  */
   if (level > 0)
     flag_section_anchors = 2;
+}
+
+/* Only thumb1 can't support conditional execution, so return true if
+   the target is not thumb1.  */
+static bool
+arm_have_conditional_execution (void)
+{
+  return !TARGET_THUMB1;
 }
 
 #include "gt-arm.h"

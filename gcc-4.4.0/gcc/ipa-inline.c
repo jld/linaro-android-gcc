@@ -127,6 +127,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "flags.h"
 #include "cgraph.h"
 #include "diagnostic.h"
+#include "toplev.h"
 #include "timevar.h"
 #include "params.h"
 #include "fibheap.h"
@@ -142,6 +143,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-sample-profile.h"
 #include "toplev.h"
 #include "dbgcnt.h"
+#include "tree-dump.h"
 
 /* Mode incremental inliner operate on:
 
@@ -159,6 +161,42 @@ enum inlining_mode {
   INLINE_SIZE,
   INLINE_ALL
 };
+
+/* List of user-specified plans for inlining passes.  Specified with
+   -finline-plan-<pass>=<file>.  */
+
+struct inline_plan_file *inline_plan_files;
+
+/* A linked list of callsites used to describe a chain of inlined
+   callsites which describes the context of an inlining decision.  The
+   first element in the list is the outermost containing function.
+   The last two elements are the caller and callee of the inlined
+   edge.  */
+
+struct callsite_chain {
+  char *function_name;
+  int callsite_no;
+  struct callsite_chain *next;
+};
+
+/* Defines a specific inlining decision in an inline plan file.  */
+
+struct inline_decision {
+  struct callsite_chain *chain;
+  int line_no;
+  struct inline_decision *next;
+};
+
+/* Defines the set of decisions in an inline plan file.  */
+
+struct inline_plan {
+  struct inline_plan_file *file;
+  struct inline_decision *decisions;
+};
+
+/* If non-NULL, then the plan for the current early inlining pass.  */
+
+struct inline_plan *einline_plan;
 
 const char *inlining_mode_strings[] = { "INLINE_NONE",
 					"INLINE_ALWAYS_INLINE",
@@ -178,6 +216,29 @@ static gcov_type max_count;
 
 /* Holders of ipa cgraph hooks: */
 static struct cgraph_node_hook_list *function_insertion_hook_holder;
+
+/* Data structures for hot components.  */
+struct hot_component {
+  struct cgraph_node *root;
+  int uid;
+  int size;
+  int original_size;
+};
+
+struct hot_component_list
+{
+  struct hot_component *component;
+  struct hot_component_list *next;
+};
+
+/* Total number of hot components.  */
+static int n_hot_components = 0;
+/* Array containing all hot components.  Indexed by component uid.  */
+static struct hot_component *hot_components = NULL;
+/* Lists of hot components of each cgraph node.  Indexed by node uid.  */
+static struct hot_component_list **node_hot_component_list = NULL;
+/* Size of NODE_HOT_COMPONENT_LIST.  */
+static int hot_component_max_id = 0;
 
 
 /* Return the stringified value of enum function_frequency for
@@ -210,6 +271,496 @@ static inline struct inline_summary *
 inline_summary (struct cgraph_node *node)
 {
   return &node->local.inline_summary;
+}
+
+/* Return true if NODE is a hot function.  */
+
+static bool
+hot_function_p (struct cgraph_node *node)
+{
+  struct cgraph_edge *edge;
+
+  if (node->local.inline_summary.self_hot_insns > 0)
+    return true;
+
+  for (edge = node->callees; edge; edge = edge->next_callee)
+    if (cgraph_maybe_hot_edge_p (edge))
+      return true;
+
+  for (edge = node->callers; edge; edge = edge->next_caller)
+    if (cgraph_maybe_hot_edge_p (edge))
+      return true;
+
+  return false;
+}
+
+
+/* Return the pointer to the list of hot components for NODE.  Global
+   array NODE_HOT_COMPONENT_LIST is resized as necessary for new nodes
+   with uid's that exceed the bounds of the current array.  This may
+   occur due to cloning.  */
+
+static struct hot_component_list**
+hot_component_list_for_node (struct cgraph_node *node)
+{
+  if (node->uid >= hot_component_max_id)
+    {
+      int i, newsize;
+
+      newsize = node->uid * 2;
+      node_hot_component_list =
+        XRESIZEVEC (struct hot_component_list *, node_hot_component_list,
+                    newsize);
+      for (i = hot_component_max_id; i < newsize; i++)
+        node_hot_component_list[i] = NULL;
+      hot_component_max_id = newsize;
+    }
+  return &node_hot_component_list[node->uid];
+}
+
+/* Return true if NODE is in the hot component with uid UID.  */
+
+static bool
+node_in_hot_component_p (struct cgraph_node *node, int uid)
+{
+  struct hot_component_list *p;
+
+  for (p = *(hot_component_list_for_node (node)); p; p = p->next)
+    if (p->component->uid == uid)
+      return true;
+  return false;
+}
+
+/* Performs a downward DFS search from NODE in the hot call graph, and
+   marks all successors of NODE by setting its respective bit in
+   SUCCESSORS.  */
+
+static void
+mark_all_successors  (struct cgraph_node *node, sbitmap successors)
+{
+  struct cgraph_edge *edge;
+
+  SET_BIT (successors, node->uid);
+  for (edge = node->callees; edge; edge = edge->next_callee)
+    if (cgraph_maybe_hot_edge_p (edge)
+        && !TEST_BIT (successors, edge->callee->uid))
+      mark_all_successors (edge->callee, successors);
+}
+
+/* Performs an upward DFS search from NODE in the hot call graph.  If
+   a node is encountered whose bit is not set in sbitmap MARKED, then
+   return false otherwise return true.  As each node is visited, the
+   node's corresponding element in VISITED is set to ID.  */
+
+static bool
+has_unmarked_predecessor_p  (struct cgraph_node *node, sbitmap marked,
+                             int *visited, int id)
+{
+  struct cgraph_edge *edge;
+
+  visited[node->uid] = id;
+  for (edge = node->callers; edge; edge = edge->next_caller)
+    if (cgraph_maybe_hot_edge_p (edge)
+        && visited[edge->caller->uid] != id)
+      {
+        if (!TEST_BIT (marked, edge->caller->uid))
+          /* An unmarked predecessor was encountered.  */
+          return true;
+        /* Continue upward DFS search.  */
+        if (has_unmarked_predecessor_p (edge->caller, marked,
+                                        visited, id))
+            return true;
+      }
+  return false;
+}
+
+/* Add NODE to hot component COMP.  */
+
+static void
+add_node_to_hot_component (struct hot_component *comp,
+                           struct cgraph_node *node)
+{
+  struct hot_component_list *p = XNEW (struct hot_component_list);
+  p->component = comp;
+  p->next = *(hot_component_list_for_node (node));
+  *(hot_component_list_for_node (node)) = p;
+}
+
+/* Perform a downward DFS seach in the hot call graph, and mark NODE
+   as a member of hot component COMP.  Returns the total number of hot
+   insns beneath this point in the DFS search.  As each node is
+   visited, set the corresponding element in VISITED to ID.  */
+
+static int
+construct_hot_component (struct cgraph_node *node, struct hot_component *comp,
+                         int *visited, int id)
+{
+  struct cgraph_edge *edge;
+  int size = node->local.inline_summary.self_hot_insns;
+
+  visited[node->uid] = id;
+  add_node_to_hot_component (comp, node);
+  for (edge = node->callees; edge; edge = edge->next_callee)
+    if (cgraph_maybe_hot_edge_p (edge)
+        && visited[edge->callee->uid] != id)
+      size += construct_hot_component (edge->callee, comp, visited, id);
+  return size;
+}
+
+/* Recompute the hot components which NODE is contained in.  */
+
+static void
+update_hot_components_for_node (struct cgraph_node *node)
+{
+  struct cgraph_edge *e;
+  struct hot_component_list *p, *tmp;
+
+  /* Free old list.  */
+  p = *(hot_component_list_for_node (node));
+  while (p)
+    {
+      tmp = p->next;
+      free (p);
+      p = tmp;
+    }
+  *(hot_component_list_for_node (node)) = NULL;
+
+  /* Hot components of NODE is the union of all hot components of
+     NODE's hot callers.  */
+  for (e = node->callers; e; e = e->next_caller)
+    if (cgraph_maybe_hot_edge_p (e))
+      for (p = *(hot_component_list_for_node (e->caller)); p; p = p->next)
+        if (!node_in_hot_component_p (node, p->component->uid))
+          add_node_to_hot_component (p->component, node);
+}
+
+/* Identify the hot components of the call graph, and construct data
+   structures to track their size and growth.
+
+   A hot component is a connected component of maximum size in the hot
+   call graph, where the hot call graph is the subgraph of the call
+   graph induced by all hot nodes and hot edges.  The total number of
+   hot instructions in the component (its size) is roughly the I-cache
+   footprint of this hot region of code.  Limiting the size of the hot
+   component can prevent I-cache thrashing.
+
+   Each hot component is defined by a root.  In the simple case, a
+   root is a hot function with no incoming hot edges (with any number
+   of outgoing hot edges).  In the more complicated case with
+   recursion, a root can be a member of strongly connected component
+   in the hot call graph which has no incoming hot edges from outside
+   the strongly connected component.  In both cases, the hot component
+   is defined as the root plus the successors of the root in the hot
+   call graph.  Typically the root is a function with an un-hot entry
+   that contains a hot loop and all functions called transitively
+   along hot edges from within the loop.  */
+
+struct node_list
+{
+  struct cgraph_node *node;
+  struct node_list *next;
+};
+
+void
+compute_hot_components (void)
+{
+  struct cgraph_node *node;
+  struct node_list *p;
+  struct node_list *roots = NULL;
+  sbitmap successor;
+  int *visited;
+  int uid, i;
+
+  /* VISITED is used to flag nodes which have already been visited
+     during some DFS searches.  If VISITED[UID] equals some_unique_id,
+     then the cgraph node with uid UID has been visited.  This
+     mechanism is preferable for some searches to a sbitmap, because
+     it not need to be reset between sequential searches which overlap
+     in the call graph, only a new unique id needs to be chosen.  */
+  visited = XNEWVEC (int, cgraph_max_uid);
+  for (i = 0; i < cgraph_max_uid; i++)
+    visited[i] = -1;
+
+  /* Identify a root node for each hot component.  A node is a root if
+     all of its predecessors (if any) in the hot call graph are also
+     successors.  */
+  n_hot_components = 0;
+  successor = sbitmap_alloc (cgraph_max_uid);
+  sbitmap_zero (successor);
+  for (node = cgraph_nodes; node; node = node->next)
+    if (hot_function_p (node))
+      {
+        /* If NODE is a successor of a node previously handled in this
+           loop, then no need to consider it as a root node.  */
+        if (TEST_BIT(successor, node->uid))
+          continue;
+
+        /* Set bit in successor of NODE and all successors of NODE.
+           An sbitmap is used (rather than the int visited array)
+           because "successor" state is preserved across calls to
+           mark_all_successors.  State is not cleared.  */
+        mark_all_successors (node, successor);
+
+        /* VISITED array is used to mark nodes for upward DFS searches
+           because subsequent has_marked_predecessor searches may
+           overlap previous searches in the call graph, and we don't
+           want to reset a bitmap every time.  ID for visited array is
+           call graph node uid.  */
+        if (!has_unmarked_predecessor_p (node, successor, visited, node->uid))
+          {
+            struct node_list *elem = XNEW (struct node_list);
+            elem->node = node;
+            elem->next = roots;
+            roots = elem;
+            n_hot_components++;
+          }
+      }
+  sbitmap_free (successor);
+
+  if (n_hot_components)
+    {
+      /* Allocate global state for hot components.  For
+         NODE_HOT_COMPONENT_LIST (indexed by call graph node uid),
+         allocate twice the current max node uid to allow for call graph
+         node cloning.  Array is dynamically resized in the unlikely event
+         this is insufficient.  */
+      hot_components = XNEWVEC (struct hot_component, n_hot_components);
+
+      hot_component_max_id = cgraph_max_uid * 2;
+      node_hot_component_list = XCNEWVEC (struct hot_component_list *,
+                                          hot_component_max_id);
+
+      /* Reset VISITED array.  */
+      for (i = 0; i < cgraph_max_uid; i++)
+        visited[i] = -1;
+
+      /* Iterate through list of root nodes and construct hot
+         components.  */
+      uid = 0;
+      p = roots;
+      while (p)
+        {
+          struct node_list *tmp;
+
+          hot_components[uid].root = p->node;
+          hot_components[uid].uid = uid;
+          /* Identify all nodes in the hot component with a downward
+             DFS search from the root.  Use VISITED array as
+             subsequent searches may overlap (ie, a node may be in
+             more than one hot component).  ID for visited array is
+             uid of the root node.  */
+          hot_components[uid].size =
+            construct_hot_component (hot_components[uid].root,
+                                     &hot_components[uid],
+                                     visited, uid);
+          hot_components[uid].original_size = hot_components[uid].size;
+          uid++;
+
+          /* Free node_list element.  */
+          tmp = p->next;
+          free (p);
+          p = tmp;
+        }
+    }
+  free (visited);
+
+#ifdef ENABLE_CHECKING
+  verify_hot_components ();
+#endif
+}
+
+/* Perform a downward DFS seach in the hot call graph.  Verifies NODE
+   is in hot component with uid UID.  Accumulates total number of hot
+   insns in *SIZE.  Returns the number of call graph nodes beneath
+   this point in the DFS search.  */
+
+static int
+verify_hot_components_1 (struct cgraph_node *node, sbitmap visited,
+                         int comp_uid, int *size)
+{
+  struct cgraph_edge *edge;
+  int nnodes = 1;
+
+  SET_BIT (visited, node->uid);
+  *size += node->local.inline_summary.self_hot_insns;
+  for (edge = node->callees; edge; edge = edge->next_callee)
+    if (cgraph_maybe_hot_edge_p (edge)
+        && !TEST_BIT (visited, edge->callee->uid))
+      {
+        gcc_assert (node_in_hot_component_p (edge->callee, comp_uid));
+        nnodes += verify_hot_components_1 (edge->callee, visited,
+                                           comp_uid, size);
+      }
+  return nnodes;
+}
+
+/* Verify global data structures for hot components.  */
+
+void
+verify_hot_components (void)
+{
+  if (n_hot_components)
+    {
+      int i;
+      struct cgraph_node *node;
+      sbitmap visited = sbitmap_alloc (cgraph_max_uid);
+
+      /* Each hot function must be in at least one hot component, and a
+         non-hot function must not be in a hot component.  */
+      for (node = cgraph_nodes; node; node = node->next)
+        {
+          struct hot_component_list *lst = *(hot_component_list_for_node (node));
+          gcc_assert ((hot_function_p (node) && lst)
+                      || (!hot_function_p (node) && !lst));
+        }
+
+      /* Verify each hot component.  */
+      for (i = 0; i < n_hot_components; i++)
+        {
+          struct hot_component *comp = &hot_components[i];
+          struct hot_component_list *root_lst =
+            *(hot_component_list_for_node (comp->root));
+          int nnodes;
+          int size = 0;
+
+          /* The root node of each hot component must be in exactly
+             one hot component (the component it is the root of).  */
+          gcc_assert (root_lst && !root_lst->next);
+          gcc_assert (node_in_hot_component_p (comp->root, comp->uid));
+
+          /* Every node accessible via downward DFS search in the hot
+             call graph from a root node must be in the root node's
+             hot component, and these nodes are the only nodes in the
+             hot component.  */
+          sbitmap_zero (visited);
+          nnodes = verify_hot_components_1 (comp->root, visited,
+                                            comp->uid, &size);
+          gcc_assert (size == comp->size);
+          /* Count down nodes which are found to in a dumb search
+             through the hot component lists of cgraph nodes.  */
+          for (node = cgraph_nodes; node; node = node->next)
+            if (hot_function_p (node)
+                && node_in_hot_component_p (node, comp->uid))
+              nnodes--;
+          gcc_assert (nnodes == 0);
+        }
+      sbitmap_free (visited);
+    }
+}
+
+/* Free all global data structures for hot components.  */
+
+void
+free_hot_components (void)
+{
+  if (n_hot_components)
+    {
+      int i;
+
+      n_hot_components = 0;
+      free (hot_components);
+      hot_components = NULL;
+      for (i = 0; i < hot_component_max_id; i++)
+        {
+          struct hot_component_list *tmp, *p = node_hot_component_list[i];
+          while (p)
+            {
+              tmp = p->next;
+              free (p);
+              p = tmp;
+            }
+        }
+      hot_component_max_id = 0;
+      free (node_hot_component_list);
+      node_hot_component_list = NULL;
+    }
+}
+
+/* Return the growth in insns of the hot component with uid UID if
+   EDGE is inlined.  */
+
+static int
+hot_component_growth_after_inlining (struct cgraph_edge *edge, int uid)
+{
+  struct cgraph_edge *e;
+  int code_duplication = 0;
+
+  if (!node_in_hot_component_p (edge->callee, uid))
+    return 0;
+
+  /* If a hot caller of EDGE's callee (other than EDGE) is also
+     contained in this hot component, then the hot component will grow
+     by the number of hot insns in the callee.
+
+     In this case, if EDGE is inlined both the old and duplicated node
+     will be in the hot component.  */
+  for (e = edge->callee->callers; e; e = e->next_caller)
+    {
+      if (e == edge || !cgraph_maybe_hot_edge_p (e))
+        continue;
+
+      if (node_in_hot_component_p (e->caller, uid))
+        {
+          /* Function body will be duplicated within component.  */
+          code_duplication = edge->callee->local.inline_summary.self_hot_insns;
+          break;
+        }
+    }
+
+  return code_duplication;
+}
+
+static void
+dump_hot_components_1 (FILE *f, struct cgraph_node *node, sbitmap visited,
+                       int indent, struct cgraph_edge *incoming_edge)
+{
+  int i;
+  struct hot_component_list *p;
+
+  for (i = 0; i < indent; i++)
+    fprintf (f, "  ");
+  fprintf (f, "%s/%d", cgraph_node_name (node), node->uid);
+  if (incoming_edge && !incoming_edge->inline_failed)
+    fprintf (f, " (INLINED)");
+  fprintf (f, " insns hot/all %d/%d, in components (",
+           node->local.inline_summary.self_hot_insns,
+           node->local.inline_summary.self_insns);
+  for (p = *(hot_component_list_for_node (node)); p; p = p->next)
+    fprintf (f, " %d", p->component->uid);
+  fprintf (f, " )");
+
+  if (TEST_BIT (visited, node->uid))
+    /* NODE has already been dumped earlier in the output. */
+    fprintf (f, " [repeat]\n");
+  else
+    {
+      struct cgraph_edge *edge;
+
+      fprintf (f, "\n");
+      SET_BIT (visited, node->uid);
+      for (edge = node->callees; edge; edge = edge->next_callee)
+        if (cgraph_maybe_hot_edge_p (edge))
+          dump_hot_components_1 (f, edge->callee, visited, indent + 1, edge);
+    }
+}
+
+/* Dump the functions within each hot components to F in a tree
+   format. */
+
+void
+dump_hot_components (FILE *f)
+{
+  sbitmap visited = sbitmap_alloc (cgraph_max_uid);
+  int i;
+
+  for (i = 0; i < n_hot_components; i++)
+    {
+      sbitmap_zero (visited);
+      fprintf (f, "Hot component %d (hot insns = %d):\n", hot_components[i].uid,
+               hot_components[i].size);
+      dump_hot_components_1 (f, hot_components[i].root, visited, 1, NULL);
+    }
+  sbitmap_free (visited);
 }
 
 /* Estimate size of the function after inlining WHAT into TO.  */
@@ -255,10 +806,33 @@ cgraph_clone_inlined_nodes (struct cgraph_edge *e, bool duplicate,
 	}
       else
 	{
-	  struct cgraph_node *n;
-	  n = cgraph_clone_node (e->callee, e->count, e->frequency, e->loop_nest, 
-				 update_original);
+	  struct cgraph_node *n, *orig_callee = e->callee;
+          bool update_hot_components =
+            (flag_limit_hot_components && n_hot_components
+             && cgraph_maybe_hot_edge_p (e));
+
+	  if (update_hot_components)
+            {
+              struct hot_component_list *p;
+
+              /* Update component sizes due to inlining edge before
+                 cloning because hot_component_growth_after_inlining()
+                 requires the edge be in its pre-inlined position.  */
+              for (p = *(hot_component_list_for_node (e->caller)); p;
+                   p = p->next)
+                p->component->size +=
+                  hot_component_growth_after_inlining (e, p->component->uid);
+            }
+
+          n = cgraph_clone_node (e->callee, e->count, e->frequency,
+                                 e->loop_nest, update_original);
 	  cgraph_redirect_edge_callee (e, n);
+
+	  if (update_hot_components)
+            {
+              update_hot_components_for_node (n);
+              update_hot_components_for_node (orig_callee);
+            }
 	}
     }
 
@@ -280,6 +854,107 @@ cgraph_clone_inlined_nodes (struct cgraph_edge *e, bool duplicate,
   for (e = e->callee->callees; e; e = e->next_callee)
     if (!e->inline_failed)
       cgraph_clone_inlined_nodes (e, duplicate, update_original);
+}
+
+
+/* Allocates and returns a unique name for NODE.  For most nodes this
+   is simply the result of cgraph_node_name.  For versioned clones
+   which share a common cgraph_node_name, the assembly name is
+   appended.  */
+
+static char*
+create_unique_cgraph_node_name (struct cgraph_node *node)
+{
+  char *name;
+  int len = strlen (cgraph_node_name (node)) + 1;
+  if (node->is_versioned_clone)
+    {
+      gcc_assert (DECL_ASSEMBLER_NAME_SET_P (node->decl));
+      len += strlen (" (clone )");
+      len += strlen (IDENTIFIER_POINTER (decl_assembler_name (node->decl)));
+    }
+  name = XNEWVEC (char, len);
+  if (node->is_versioned_clone)
+    sprintf (name, "%s (clone %s)", cgraph_node_name (node),
+             IDENTIFIER_POINTER (decl_assembler_name (node->decl)));
+  else
+    strcpy (name, cgraph_node_name (node));
+  return name;
+}
+
+/* Print a unique name for NODE to F.  This is the same name as
+   create_unique_cgraph_node_name, but this function doesn't allocate
+   memory.  */
+
+static void
+dump_unique_cgraph_node_name (FILE *f, struct cgraph_node *node)
+{
+  fprintf (f, cgraph_node_name (node));
+  if (node->is_versioned_clone)
+    {
+      gcc_assert (DECL_ASSEMBLER_NAME_SET_P (node->decl));
+      fprintf (f, " (clone %s)",
+               IDENTIFIER_POINTER (decl_assembler_name (node->decl)));
+    }
+}
+
+/* Returns true if the unique name of NODE is NAME.  */
+
+static bool
+cgraph_node_matches_unique_name_p (struct cgraph_node *node, const char *name)
+{
+  char *node_name = create_unique_cgraph_node_name (node);
+  bool matches = (strcmp (node_name, name) == 0);
+  free (node_name);
+  return matches;
+}
+
+/* Return the ordinal position of the callsite of EDGE among all calls
+   of EDGE->CALLEE in EDGE->CALLER.  Numbering starts at 1, so the
+   edge of the first call returns 1, the second returns 2, etc.  */
+
+static int
+callsite_position (struct cgraph_edge *edge)
+{
+  int c = 1;
+  struct cgraph_edge *e;
+
+  /* The list of call graph edges are in the inverse order in which
+     their respective callsites appear in the function, so count the
+     number of edges after EDGE with the same callee.  */
+  for (e = edge->next_callee; e; e = e->next_callee)
+    if (e->callee->decl == edge->callee->decl)
+      c++;
+
+  return c;
+}
+
+/* For the inlined edge EDGE, dump (into F) the chain of inlined
+   callsites from the enclosing function down to EDGE's callee.  For
+   example, suppose FuncC calls FuncB calls FuncA.  If FuncA is
+   inlined into an inlined copy of FuncB called by FuncC, then the
+   chain for this particular edge FuncB->FuncA might look like:
+
+     FuncA @callsite #1 into FuncB @callsite #3 into FuncC
+
+   Simlilar callsites (same caller, same callee) are numbered
+   consecutively from the beginning of the caller to uniquely identify
+   multiple calls to the same function.
+
+   This chain precisely describes the context of inlining a particular
+   edge.  The format of this dump is the same as that used to describe
+   inlined callsites in the inline plan specified with
+   -finline-plan-<pass>=<file>.  */
+
+static void
+dump_inlining_decision (FILE *f, struct cgraph_edge *edge)
+{
+  dump_unique_cgraph_node_name (f, edge->callee);
+  fprintf (f, " @callsite #%d into ", callsite_position (edge));
+  if (edge->caller->global.inlined_to)
+    dump_inlining_decision (f, edge->caller->callers);
+  else
+    dump_unique_cgraph_node_name (f, edge->caller);
 }
 
 /* Mark edge E as inlined and update callgraph accordingly.  UPDATE_ORIGINAL
@@ -324,6 +999,13 @@ cgraph_mark_inline_edge (struct cgraph_edge *e, bool update_original,
   if (new_insns > old_insns)
     overall_insns += new_insns - old_insns;
   ncalls_inlined++;
+
+  if (dump_file)
+    {
+      fprintf (dump_file, "INLINE: ");
+      dump_inlining_decision (dump_file, curr);
+      fprintf (dump_file, "\n");
+    }
 
   if (flag_indirect_inlining)
     return ipa_propagate_indirect_call_infos (curr, new_edges);
@@ -460,6 +1142,38 @@ cgraph_check_inline_limits (struct cgraph_node *to, struct cgraph_node *what,
       return false;
     }
   return true;
+}
+
+/* Return false when inlining EDGE is not good idea.  Checks for hot
+   component growth and calls cgraph_check_inline_limits for all other
+   checks.  */
+
+static bool
+cgraph_check_inline_limits_edge (struct cgraph_edge *edge, const char **reason)
+{
+  if (flag_limit_hot_components && n_hot_components
+      && cgraph_maybe_hot_edge_p (edge))
+    {
+      struct hot_component_list *p;
+
+      for (p = *(hot_component_list_for_node (edge->caller)); p; p = p->next)
+        {
+          int newsize = p->component->size
+            + hot_component_growth_after_inlining (edge, p->component->uid);
+          int limit = p->component->original_size;
+
+          limit += limit * PARAM_VALUE (PARAM_HOT_COMPONENT_GROWTH) / 100;
+          if (newsize > p->component->size
+              && newsize > PARAM_VALUE (PARAM_LARGE_HOT_COMPONENT_INSNS)
+              && newsize > limit)
+            {
+              if (reason)
+                *reason = N_("--param hot-component-growth limit reached");
+              return false;
+            }
+        }
+    }
+  return cgraph_check_inline_limits (edge->caller, edge->callee, reason, true);
 }
 
 /* Return true when function N is small enough to be inlined.  */
@@ -816,6 +1530,39 @@ lookup_recursive_calls (struct cgraph_node *node, struct cgraph_node *where,
       lookup_recursive_calls (node, e->callee, heap);
 }
 
+/* Create a clone of NODE to use in recursive inlining.  */
+
+static struct cgraph_node*
+create_recursive_clone (struct cgraph_node *node)
+{
+  struct cgraph_node *clone;
+  struct cgraph_edge *e;
+
+  clone = cgraph_clone_node (node, node->count, CGRAPH_FREQ_BASE, 1, false);
+  clone->needed = true;
+  for (e = clone->callees; e; e = e->next_callee)
+    if (!e->inline_failed)
+      cgraph_clone_inlined_nodes (e, true, false);
+
+  return clone;
+}
+
+/* Delete the cloned node NODE used for recursive inlining.  */
+
+static void
+delete_recursive_clone (struct cgraph_node *clone)
+{
+  struct cgraph_node *node, *next;
+
+  for (node = cgraph_nodes; node != clone; node = next)
+    {
+      next = node->next;
+      if (node->global.inlined_to == clone)
+	cgraph_remove_node (node);
+    }
+  cgraph_remove_node (clone);
+}
+
 /* Decide on recursive inlining: in the case function has recursive calls,
    inline until body size reaches given argument.  If any new indirect edges
    are discovered in the process, add them to *NEW_EDGES, unless NEW_EDGES
@@ -829,8 +1576,7 @@ cgraph_decide_recursive_inlining (struct cgraph_node *node,
   int max_depth = PARAM_VALUE (PARAM_MAX_INLINE_RECURSIVE_DEPTH_AUTO);
   int probability = PARAM_VALUE (PARAM_MIN_INLINE_RECURSIVE_PROBABILITY);
   fibheap_t heap;
-  struct cgraph_edge *e;
-  struct cgraph_node *master_clone, *next;
+  struct cgraph_node *master_clone;
   int depth = 0;
   int n = 0;
 
@@ -862,11 +1608,7 @@ cgraph_decide_recursive_inlining (struct cgraph_node *node,
 	     cgraph_node_name (node));
 
   /* We need original clone to copy around.  */
-  master_clone = cgraph_clone_node (node, node->count, CGRAPH_FREQ_BASE, 1, false);
-  master_clone->needed = true;
-  for (e = master_clone->callees; e; e = e->next_callee)
-    if (!e->inline_failed)
-      cgraph_clone_inlined_nodes (e, true, false);
+  master_clone = create_recursive_clone (node);
 
   /* Do the inlining and update list of recursive call during process.  */
   while (!fibheap_empty (heap)
@@ -938,14 +1680,8 @@ cgraph_decide_recursive_inlining (struct cgraph_node *node,
   /* Remove master clone we used for inlining.  We rely that clones inlined
      into master clone gets queued just before master clone so we don't
      need recursion.  */
-  for (node = cgraph_nodes; node != master_clone;
-       node = next)
-    {
-      next = node->next;
-      if (node->global.inlined_to == master_clone)
-	cgraph_remove_node (node);
-    }
-  cgraph_remove_node (master_clone);
+  delete_recursive_clone (master_clone);
+
   /* FIXME: Recursive inlining actually reduces number of calls of the
      function.  At this place we should probably walk the function and
      inline clones and compensate the counts accordingly.  This probably
@@ -1247,8 +1983,7 @@ cgraph_decide_inlining_of_small_functions (void)
 	{
 	  struct cgraph_node *callee;
 	  if (gimple_call_cannot_inline_p (edge->call_stmt)
-	      || !cgraph_check_inline_limits (edge->caller, edge->callee,
-					      &edge->inline_failed, true))
+	      || !cgraph_check_inline_limits_edge (edge, &edge->inline_failed))
 	    {
 	      if (dump_file)
 		fprintf (dump_file,
@@ -1360,6 +2095,474 @@ cgraph_decide_inlining_of_small_functions (void)
   BITMAP_FREE (updated_nodes);
 }
 
+/* Frees the linked list LST of struct CALLSITE_CHAIN elements.  */
+
+static void
+free_callsite_chain (struct callsite_chain *lst)
+{
+  while (lst)
+    {
+      struct callsite_chain *p = lst;
+      lst = lst->next;
+      if (p->function_name)
+        free (p->function_name);
+      free (p);
+    }
+}
+
+/* Frees inline plan PLAN.  */
+
+static void
+free_inline_plan (struct inline_plan *plan)
+{
+  struct inline_decision *decision, *tmp;
+
+  decision = plan->decisions;
+  while (decision)
+    {
+      free_callsite_chain (decision->chain);
+      tmp = decision->next;
+      free (decision);
+      decision = tmp;
+    }
+  free (plan);
+}
+
+/* Returns a copy of SRC allocated with XNEW with leading and trailing
+   whitespace removed.  */
+
+static char *
+new_stripped_string (const char *src)
+{
+  const char *start = NULL, *end = NULL, *p;
+  char *dst;
+
+  for (; *src; src++)
+    if (!ISSPACE (*src))
+      {
+        if (!start)
+          start = src;
+        end = src + 1;
+      }
+  dst = XNEWVEC (char, end - start + 1);
+  strncpy (dst, start, end - start);
+  dst[end - start] = 0;
+  return dst;
+}
+
+/* Allocates, copies, and returns the substring up to the first
+   instance of SEPARATOR in BUF.  Leading and trailing whitespace are
+   stripped in the copy.  If NEXT is not NULL, then *NEXT is set to
+   the location in buffer immediately after SEPARATOR.  If SEPARATOR
+   is not found, then *NEXT is set to NULL and NULL is returned.  */
+
+static char *
+new_token_before_separator (char *buf, const char *separator, char **next)
+{
+  char tmp;
+  char *p, *token;
+
+  p = strstr (buf, separator);
+  if (!p)
+    {
+      /* Separator not found in BUF.  */
+      if (next)
+        *next = NULL;
+      return NULL;
+    }
+
+  /* Temporarily zero terminate BUF at the beginning of SEPARATOR.  */
+  tmp = *p;
+  *p = 0;
+  token = new_stripped_string (buf);
+  *p = tmp;
+
+  /* Set *NEXT to beyond the end of SEPARATOR in BUF.  */
+  if (next)
+     *next = p + strlen (separator);
+
+  return token;
+}
+
+/* Parse the string STR containing an inline chain.  The string
+   representation of the chain is the format output by
+   DUMP_INLINING_DECISION.  For example:
+
+     FuncA @callsite #1 into FuncB @callsite #5 into ... into FuncZ
+
+   Returns a list of CALLSITE_CHAIN elements.  */
+
+static struct callsite_chain*
+parse_inlining_decision (char *str)
+{
+  struct callsite_chain *chain = NULL;
+  char *loc = str;
+  bool error = false;
+
+  while (loc)
+    {
+      char *starting_loc = loc;
+      struct callsite_chain *plink = XCNEW (struct callsite_chain);
+
+      plink->next = chain;
+      chain = plink;
+      plink->function_name =
+        new_token_before_separator (starting_loc, "@callsite #", &loc);
+
+      if (loc)
+        {
+          /* Extract callsite number.  */
+          char *callsite_str = new_token_before_separator (loc, "into", &loc);
+          if (!loc)
+            {
+              error = true;
+              break;
+            }
+          plink->callsite_no = atoi (callsite_str);
+          free (callsite_str);
+        }
+      else
+        {
+          /* No callsite string found, so this must be final function in
+             chain.  Final function name is last part of line.  */
+          plink->function_name = new_stripped_string (starting_loc);
+          plink->callsite_no = 0;
+        }
+  }
+
+  /* Check for error and at least two elements in list.  */
+  if (error || !chain || !chain->next)
+    {
+      free_callsite_chain (chain);
+      chain = NULL;
+    }
+
+  return chain;
+}
+
+
+/* Returns the non-inlined cgraph node with unique name NAME.  The
+   search skips over cgraph node SKIP if non-NULL.  This is useful
+   with recursive inlining which creates a dummy cgraph node clone.
+
+   TODO: This is inefficient.  Probably better to do with a hash.  */
+
+static struct cgraph_node *
+find_named_cgraph_node (const char *name, struct cgraph_node *skip)
+{
+  struct cgraph_node *node;
+
+  for (node = cgraph_nodes; node; node = node->next)
+    if (!node->global.inlined_to
+        && node != skip
+        && node->analyzed
+        && node->master_clone == node
+        && cgraph_node_matches_unique_name_p (node, name))
+      break;
+  return node;
+}
+
+/* Inlines the edge specified by CHAIN.  *CLONE, if non-NULL, is the
+   cloned callee used for recursive inlining.  This mechanism is
+   required because a cloned node is used for consecutive recursive
+   inlining decisions for edges with the same callee (see
+   cgraph_decide_recursive_inlining).  *CLONE is updated to point to
+   the new recursive clone if one is created.  In case of error, an
+   error string is copied into ERROR_MSG of maximum length
+   MSG_LEN.  */
+
+static bool
+inline_edge_defined_by_chain (struct callsite_chain *chain,
+                              struct cgraph_node **clone,
+                              char *error_msg, int msg_len)
+{
+  struct cgraph_node *caller, *first_caller;
+  struct callsite_chain *pchain;
+  struct cgraph_edge *edge = NULL;
+  char *caller_name = NULL;
+
+  /* The first function in the chain is the enclosing function in
+     which the edge is ultimately inlined into.  Find the cgraph node
+     for this function, skipping any potential clone.  */
+  first_caller = find_named_cgraph_node (chain->function_name, *clone);
+  if (!first_caller)
+    {
+      snprintf (error_msg, msg_len, "no function named %s found",
+                chain->function_name);
+      return false;
+    }
+  caller = first_caller;
+  caller_name = chain->function_name;
+
+  pchain = chain->next;
+  gcc_assert (pchain);
+  while (pchain)
+    {
+      int callsite = 0;
+
+      /* Find last callee.  Edges in the call graph are in the reverse
+         order in which they appear in the code, so the edges must be
+         walked backwards to find the n-th one.  */
+      for (edge = caller->callees;
+           edge && edge->next_callee;
+           edge = edge->next_callee)
+        { /* Nothing. */ }
+
+      if (edge)
+        /* Iterating backwards, find the n-th (where n = PCHAIN->CALLSITE_NO)
+           call to function PCHAIN->FUNCTION_NAME backwards in the list.  */
+        for ( ; edge ; edge = edge->prev_callee)
+          if (cgraph_node_matches_unique_name_p (edge->callee,
+                                                 pchain->function_name))
+            {
+              callsite++;
+              if (callsite == pchain->callsite_no)
+                break;
+            }
+
+      if (edge == NULL)
+        {
+          /* Edge corresponding to the particular callsite defined by
+             PCHAIN was not found.  */
+          if (callsite == 0)
+            snprintf (error_msg, msg_len, "%s does not call %s",
+                      caller_name, pchain->function_name);
+          else
+            snprintf (error_msg, msg_len, "no callsite %d of %s in %s",
+                      pchain->callsite_no,
+                      pchain->function_name,
+                      caller_name);
+          return false;
+        }
+
+      if (pchain->next)
+        /* Edge is not the last in the chain.  Verify that edge has
+           been inlined.  */
+        if (edge->inline_failed)
+          {
+            snprintf (error_msg, msg_len,
+                      "inlining of callsite %d of %s in %s must precede "
+		      "inlining of this edge",
+                      pchain->callsite_no,
+                      pchain->function_name,
+                      caller_name);
+            return false;
+          }
+      caller = edge->callee;
+      caller_name = pchain->function_name;
+
+      pchain = pchain->next;
+    }
+
+  gcc_assert (edge);
+  if (!edge->inline_failed)
+    {
+      snprintf (error_msg, msg_len, "edge has already been inlined");
+      return false;
+    }
+
+  if (edge->callee->decl == first_caller->decl)
+    {
+      /* This is a recursive inlining decision, so the edge needs to
+         be directed to a clone of the callee prior to marking the
+         edge for inlining.  */
+      if (*clone && (*clone)->decl != edge->callee->decl)
+        {
+          /* Recursive clone exists, but it's a clone of a different
+             call graph node from a previous recursive inlining
+             decision.  */
+          delete_recursive_clone (*clone);
+          *clone = NULL;
+        }
+      if (!*clone)
+        /* Create new clone of this node.  */
+        *clone = create_recursive_clone (edge->callee);
+
+      cgraph_redirect_edge_callee (edge, *clone);
+      cgraph_mark_inline_edge (edge, false, NULL);
+    }
+  else
+    cgraph_mark_inline_edge (edge, true, NULL);
+
+  return true;
+}
+
+/* Read an inline plan from FILENAME and return an inline_plan struct
+   describing the decisions.
+
+   Each line in the file beginning with "INLINE:" defines a single
+   inlined call graph edge.  Lines not beginning with "INLINE:" are
+   ignored.  The text after "INLINE:" should be in the same format as
+   output by dump_callsite_chain.
+
+   The debugging dumps of the inlining passes include lines defining
+   the inlining plan in this format, so the debugging dumps may be
+   input as the inlining plan to later replicate the set of inlining
+   decisions exactly.  */
+
+static struct inline_plan*
+read_inline_plan (const char *filename)
+{
+  FILE *f;
+  unsigned int max_line_len = 4096;
+  char *line = XNEWVEC (char, max_line_len);
+  int line_no = 1;
+  struct cgraph_node *node;
+  struct inline_decision *last_decision = NULL;
+  struct inline_plan *plan;
+
+  f = fopen (filename, "r");
+  if (f == (FILE *) 0)
+    fatal_error ("can't open inline plan file %s: %m", filename);
+
+  #ifdef ENABLE_CHECKING
+  /* Check for nodes with the same unique names.  */
+  for (node = cgraph_nodes; node; node = node->next)
+    if (!node->global.inlined_to && node->analyzed)
+      {
+        struct cgraph_node *node2;
+        char *node_name = create_unique_cgraph_node_name (node);
+
+        for (node2 = node->next; node2; node2 = node2->next)
+          if (!node2->global.inlined_to
+              && node2->analyzed
+              && cgraph_node_matches_unique_name_p (node2, node_name))
+            {
+              const char *asm_name = 
+                IDENTIFIER_POINTER (decl_assembler_name (node->decl));
+              const char *asm_name2 = 
+                IDENTIFIER_POINTER (decl_assembler_name (node2->decl));
+              
+              fatal_error ("cgraph node aliased unique name %s (%s != %s)",
+                           node_name, asm_name, asm_name2);
+            }
+        free (node_name);
+      }
+  #endif
+
+  plan = XCNEW (struct inline_plan);
+  while (fgets (line, max_line_len, f) != (char *) 0)
+    {
+      char *p;
+
+      /* If line doesn't fit in the buffer, then keep doubling the
+         size of buffer until it fits.  */
+      while (strlen (line) == max_line_len - 1
+             && line[max_line_len - 2] != '\n')
+        {
+          /* Double the size of the line and keep reading.  */
+          line = (char *) xrealloc (line, max_line_len * 2);
+          fgets (line + max_line_len - 1, max_line_len + 1, f);
+          max_line_len *= 2;
+        }
+
+      p = line;
+      while (*p && ISBLANK (*p))
+        p++;
+
+      if (strstr (p, "INLINE:") == p)
+        {
+          char *stripped = new_stripped_string (p + strlen ("INLINE:"));
+          struct inline_decision *decision = XNEW (struct inline_decision);
+
+          decision->line_no = line_no;
+          decision->next = NULL;
+          decision->chain = parse_inlining_decision (stripped);
+          if (!decision->chain)
+            fatal_error ("invalid line in inline plan: %s:%d: %s",
+                         filename, line_no, line);
+
+          if (last_decision)
+            {
+              last_decision->next = decision;
+              last_decision = decision;
+            }
+          else
+            plan->decisions = last_decision = decision;
+
+          free (stripped);
+        }
+      line_no++;
+    }
+  free(line);
+
+  return plan;
+}
+
+/* Return the specified plan file, if any, for the current pass.  */
+
+static struct inline_plan_file*
+get_plan_file_for_pass (void)
+{
+  struct inline_plan_file *pfile;
+  struct dump_file_info *pinfo;
+  const char *pass_suffix;
+
+  if (!inline_plan_files)
+    return NULL;
+
+  /* Use the suffix of the dump file to uniquely identify the pass,
+     rather than the name of the current pass.  The suffix includes a
+     trailing digit to resolve multiple instances of the same pass
+     (eg., "einline1" or "einline2").  It is this suffix which is
+     matched against the pass name given with
+     -finline-plan-<pass>=<file>.  */
+  pinfo = get_dump_file_info (current_pass->static_pass_number);
+  gcc_assert (pinfo);
+  
+  /* The suffix includes a leading '.'.  Skip it.  */
+  pass_suffix = pinfo->suffix + 1;
+
+  /* Find plan for this pass, if any.  */
+  for (pfile = inline_plan_files; pfile; pfile = pfile->next)
+    if (strcmp (pfile->pass_name, pass_suffix) == 0)
+      break;
+  return pfile;
+}
+
+/* Apply the set of inlining decisions defined by PLAN.  If NODE is
+   not NULL then only apply decisions with the function represented by
+   NODE.  Returns true if any edges are inlined.  TODO: In the case
+   where NODE is non-NULL, this function is inefficient as it examines
+   all decisions.  */
+
+static bool
+apply_plan (struct inline_plan *plan,
+            struct cgraph_node *node)
+{
+  char msg[256];
+  struct inline_decision *p;
+  struct cgraph_node *clone = NULL;
+  bool inlined = false;
+
+  if (dump_file)
+    {
+      fprintf (dump_file, "Applying inlining plan from file %s",
+               plan->file->filename);
+      if (node)
+        {
+          fprintf (dump_file, "to ");
+          dump_unique_cgraph_node_name (dump_file, node);
+        }
+      fprintf (dump_file, ":\n");
+    }
+
+  for (p = plan->decisions; p; p = p->next)
+    if (!node
+        || cgraph_node_matches_unique_name_p (node, p->chain->function_name))
+      {
+        if (!inline_edge_defined_by_chain (p->chain, &clone, msg, 256))
+          fatal_error ("in inline plan %s:%d: %s",
+                       plan->file->filename, p->line_no, msg);
+        inlined = true;
+      }
+
+  if (clone)
+    delete_recursive_clone (clone);
+
+  return inlined;
+}
+
 /* Decide on the inlining.  We do so in the topological order to avoid
    expenses on updating data structures.  */
 
@@ -1368,12 +2571,12 @@ cgraph_decide_inlining (void)
 {
   struct cgraph_node *node;
   int nnodes;
-  struct cgraph_node **order =
-    XCNEWVEC (struct cgraph_node *, cgraph_n_nodes);
+  struct cgraph_node **order;
   int old_insns = 0;
   int i;
   int initial_insns = 0;
   bool redo_always_inline = true;
+  struct inline_plan_file* plan_file;
 
   cgraph_remove_function_insertion_hook (function_insertion_hook_holder);
 
@@ -1405,14 +2608,26 @@ cgraph_decide_inlining (void)
       fprintf (dump_file, "flag_branch_probabilities = %d\n",
                flag_branch_probabilities);
       fprintf (dump_file, "flag_sample_profile = %d\n", flag_sample_profile);
+      fprintf (dump_file,
+               "\nDeciding on inlining.  Starting with %i insns.\n",
+               initial_insns);
     }
 
-  nnodes = cgraph_postorder (order);
+  plan_file = get_plan_file_for_pass ();
+  if (plan_file)
+    {
+      struct inline_plan *plan = read_inline_plan (plan_file->filename);
+      plan->file = plan_file;
+      apply_plan (plan, NULL);
+      free_inline_plan (plan);
+      goto end;
+    }
 
-  if (dump_file)
-    fprintf (dump_file,
-	     "\nDeciding on inlining.  Starting with %i insns.\n",
-	     initial_insns);
+  order = XCNEWVEC (struct cgraph_node *, cgraph_n_nodes);
+  if (flag_limit_hot_components)
+    compute_hot_components ();
+
+  nnodes = cgraph_postorder (order);
 
   for (node = cgraph_nodes; node; node = node->next)
     node->aux = 0;
@@ -1523,8 +2738,7 @@ cgraph_decide_inlining (void)
 
 	      old_insns = overall_insns;
 
-	      if (cgraph_check_inline_limits (node->callers->caller, node,
-					      NULL, false)
+	      if (cgraph_check_inline_limits_edge (node->callers, NULL)
                   && dbg_cnt (inl))
 		{
 		  cgraph_mark_inline (node->callers);
@@ -1552,7 +2766,11 @@ cgraph_decide_inlining (void)
 	    }
 	}
     }
+  free (order);
+  if (flag_limit_hot_components)
+    free_hot_components ();
 
+ end:
   /* Free ipa-prop structures if they are no longer needed.  */
   if (flag_indirect_inlining)
     free_all_ipa_structures_after_iinln ();
@@ -1563,7 +2781,7 @@ cgraph_decide_inlining (void)
 	     "%i insns turned to %i insns.\n\n",
 	     ncalls_inlined, nfunctions_inlined, initial_insns,
 	     overall_insns);
-  free (order);
+
   return 0;
 }
 
@@ -1913,10 +3131,38 @@ cgraph_early_inlining (void)
 {
   struct cgraph_node *node = cgraph_node (current_function_decl);
   unsigned int todo = 0;
+  bool inlined;
 
   if (sorrycount || errorcount)
     return 0;
-  if (cgraph_decide_inlining_incrementally (node, INLINE_SIZE, 0))
+
+  if (inline_plan_files)
+    {
+      struct inline_plan_file *pfile = get_plan_file_for_pass ();
+
+      /* If early inlining plan exists and is for previous inlining
+         pass, then free it.  */
+      if (einline_plan && einline_plan->file != pfile)
+        {
+          free_inline_plan (einline_plan);
+          einline_plan = NULL;
+        }
+
+      /* Read in new plan for this pass, if it exists and has not been
+         read in yet.  */
+      if (pfile && einline_plan == NULL)
+        {
+          einline_plan = read_inline_plan (pfile->filename);
+          einline_plan->file = pfile;
+        }
+    }
+
+  if (einline_plan)
+    inlined = apply_plan (einline_plan, node);
+  else
+    inlined = cgraph_decide_inlining_incrementally (node, INLINE_SIZE, 0);
+
+  if (inlined)
     {
       timevar_push (TV_INTEGRATION);
       todo = optimize_inline_calls (current_function_decl);

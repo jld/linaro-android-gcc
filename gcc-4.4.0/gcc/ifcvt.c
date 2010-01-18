@@ -47,9 +47,6 @@
 #include "vecprim.h"
 #include "dbgcnt.h"
 
-#ifndef HAVE_conditional_execution
-#define HAVE_conditional_execution 0
-#endif
 #ifndef HAVE_conditional_move
 #define HAVE_conditional_move 0
 #endif
@@ -1493,7 +1490,7 @@ noce_try_cmove_arith (struct noce_if_info *if_info)
   if (!tmp)
     return FALSE;
 
-  emit_insn_before_setloc (tmp, if_info->jump, INSN_LOCATOR (if_info->insn_a));
+  emit_insn_before_setloc (tmp, if_info->jump, INSN_LOCATOR (if_info->jump));
   return TRUE;
 
  end_seq_and_fail:
@@ -2419,7 +2416,7 @@ noce_process_if_block (struct noce_if_info *if_info)
   if (HAVE_conditional_move
       && noce_try_cmove (if_info))
     goto success;
-  if (! HAVE_conditional_execution)
+  if (! targetm.have_conditional_execution ())
     {
       if (noce_try_store_flag_constants (if_info))
 	goto success;
@@ -3062,7 +3059,7 @@ find_if_header (basic_block test_bb, int pass)
       && noce_find_if_block (test_bb, then_edge, else_edge, pass))
     goto success;
 
-  if (HAVE_conditional_execution && reload_completed
+  if (targetm.have_conditional_execution () && reload_completed
       && cond_exec_find_if_block (&ce_info))
     goto success;
 
@@ -3071,7 +3068,7 @@ find_if_header (basic_block test_bb, int pass)
     goto success;
 
   if (dom_info_state (CDI_POST_DOMINATORS) >= DOM_NO_FAST_QUERY
-      && (! HAVE_conditional_execution || reload_completed))
+      && (! targetm.have_conditional_execution () || reload_completed))
     {
       if (find_if_case_1 (test_bb, then_edge, else_edge))
 	goto success;
@@ -3177,7 +3174,7 @@ cond_exec_find_if_block (struct ce_if_block * ce_info)
 
   /* We only ever should get here after reload,
      and only if we have conditional execution.  */
-  gcc_assert (HAVE_conditional_execution && reload_completed);
+  gcc_assert (targetm.have_conditional_execution () && reload_completed);
 
   /* Discover if any fall through predecessors of the current test basic block
      were && tests (which jump to the else block) or || tests (which jump to
@@ -3813,8 +3810,7 @@ remove_reg_eq_notes (basic_block other_bb, basic_block merge_bb,
            the_ref = DF_REF_NEXT_REG (the_ref))
         {
           basic_block bb = DF_REF_BB (the_ref);
-          if (dominated_by_p (CDI_POST_DOMINATORS, other_bb, bb)
-              && ! dominated_by_p (CDI_POST_DOMINATORS, merge_bb, bb))
+          if (dominated_by_p (CDI_POST_DOMINATORS, other_bb, bb))
             insns[n_insns++] = DF_REF_INSN (the_ref);
         }
       for (j = 0; j < n_insns; j++)
@@ -3888,7 +3884,7 @@ dead_or_predicable (basic_block test_bb, basic_block merge_bb,
   /* Disable handling dead code by conditional execution if the machine needs
      to do anything funny with the tests, etc.  */
 #ifndef IFCVT_MODIFY_TESTS
-  if (HAVE_conditional_execution)
+  if (targetm.have_conditional_execution ())
     {
       /* In the conditional execution case, we have things easy.  We know
 	 the condition is reversible.  We don't have to check life info
@@ -4046,10 +4042,10 @@ dead_or_predicable (basic_block test_bb, basic_block merge_bb,
 
       /* In the above tests, TEST_LIVE doesn't take into account registers
          that are "live" by way of their mention in a REG_EQUAL note.
-         Any REG_EQUAL note present in a basic block that is dominated by
-         OTHER_BB, but not by MERGE_BB, and which contains a register present
-         in MERGE_SET, will become invalid after this transformation. Blow
-         all such REG_EQUAL notes away.  */
+         Any REG_EQUAL note present in a basic block that post-dominates
+         OTHER_BB (actually reachable from OTHER_BB, and which contains
+         a register present in MERGE_SET, will become invalid after this
+         transformation. Blow all such REG_EQUAL notes away.  */
       if (! fail)
         remove_reg_eq_notes (other_bb, merge_bb, merge_set);
 

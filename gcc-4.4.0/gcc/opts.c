@@ -43,6 +43,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dbgcnt.h"
 #include "debug.h"
 #include "plugin.h"
+#include "cgraph.h"
 
 /* Value of the -G xx switch, and whether it was passed or not.  */
 unsigned HOST_WIDE_INT g_switch_value;
@@ -76,6 +77,9 @@ enum debug_info_type write_symbols = NO_DEBUG;
 /* Level of debugging information we are producing.  See flags.h for
    the definitions of the different possible levels.  */
 enum debug_info_level debug_info_level = DINFO_LEVEL_NONE;
+
+/* Whether to include line number table with TERSE-level debug info.  */
+bool generate_debug_line_table = false;
 
 /* A major contribution to object and executable size is debug
    information size.  A major contribution to debug information size
@@ -356,6 +360,7 @@ static bool flag_value_profile_transformations_set;
 static bool flag_peel_loops_set, flag_branch_probabilities_set;
 static bool flag_inline_functions_set, flag_ipa_cp_set, flag_ipa_cp_clone_set;
 static bool flag_predictive_commoning_set, flag_unswitch_loops_set, flag_gcse_after_reload_set;
+static bool flag_limit_hot_components_set;
 
 /* Functions excluded from profiling.  */
 
@@ -738,6 +743,39 @@ flag_instrument_functions_exclude_p (tree fndecl)
   return false;
 }
 
+/* GCC command-line options saved to the LIPO profile data file.
+   See detailed comment in opts.h.  */
+const char **lipo_cl_args;
+unsigned num_lipo_cl_args;
+
+/* Inspect the given GCC command-line arguments, which are part of one GCC
+   switch, and decide whether or not to store these to the LIPO profile data
+   file.  */
+static void
+lipo_save_cl_args (unsigned int argc, const char **argv)
+{
+  unsigned int i;
+  const char *opt = argv[0];
+  /* Store the following command-line flags to the lipo profile data file:
+     (1) -f... (except -frandom-seed...)
+     (2) -m...
+     (3) -W...
+     (4) -O...
+     (5) --param...
+  */
+  if (opt[0] == '-'
+      && (opt[1] == 'f' || opt[1] == 'm' || opt[1] == 'W' || opt[1] == 'O'
+	  || (strstr (opt, "--param") == opt))
+      && !strstr(opt, "-frandom-seed")
+      && !strstr(opt, "-fripa-disallow-opt-mismatch")
+      && !strstr(opt, "-Wripa-opt-mismatch"))
+    {
+      num_lipo_cl_args += argc;
+      lipo_cl_args = XRESIZEVEC (const char *, lipo_cl_args, num_lipo_cl_args);
+      for (i = 0; i < argc; i++)
+	lipo_cl_args[num_lipo_cl_args - argc + i] = argv[i];
+    }
+}
 
 /* Decode and handle the vector of command line options.  LANG_MASK
    contains has a single bit set representing the current
@@ -772,6 +810,8 @@ handle_options (unsigned int argc, const char **argv, unsigned int lang_mask)
 	}
 
       n = handle_option (argv + i, lang_mask);
+
+      lipo_save_cl_args (n, argv + i);
 
       if (!n)
 	{
@@ -916,6 +956,7 @@ decode_options (unsigned int argc, const char **argv)
   flag_tree_pre = opt2;
   flag_tree_switch_conversion = 1;
   flag_ipa_cp = opt2;
+  flag_tree_lr_shrinking = opt2;
 
   /* Allow more virtual operators to increase alias precision.  */
 
@@ -1777,6 +1818,31 @@ common_handle_option (size_t scode, const char *arg, int value,
       set_param_value ("max-inline-insns-auto", value / 2);
       break;
 
+    case OPT_finline_plan_:
+      {
+        const char *p, *q;
+        struct inline_plan_file *plan =
+          XCNEW (struct inline_plan_file);
+
+        /* Inline plan option has the form
+           -finline-plan-<pass>=<file>.  */
+        for (p = arg; *p; p++)
+          if (*p == '=')
+            {
+              /* Everything up to but not including the '=' is the
+                 pass name.  */
+              plan->pass_name = XNEWVEC(char, p - arg + 1);
+              memcpy (plan->pass_name, arg, p - arg);
+              plan->pass_name[q - arg] = 0;
+              /* Everything after the '=' is the file name.  */
+              plan->filename = xstrdup (p + 1);
+            }
+        if (!plan->pass_name)
+          error ("plan should be of form -finline-plan-<pass>=<file>");
+        plan->next = inline_plan_files;
+        inline_plan_files = plan;
+      }
+      break;
     case OPT_finstrument_functions_exclude_function_list_:
       add_comma_separated_to_vector
 	(&flag_instrument_functions_exclude_functions, arg);
@@ -1835,33 +1901,10 @@ common_handle_option (size_t scode, const char *arg, int value,
 
     case OPT_fprofile_use_:
       profile_data_prefix = xstrdup (arg);
-      flag_profile_use = true;
       value = true;
       /* No break here - do -fprofile-use processing. */
     case OPT_fprofile_use:
-      if (!flag_branch_probabilities_set)
-        flag_branch_probabilities = value;
-      if (!flag_profile_values_set)
-        flag_profile_values = value;
-      if (!flag_unroll_loops_set)
-        flag_unroll_loops = value;
-      if (!flag_peel_loops_set)
-        flag_peel_loops = value;
-      if (!flag_value_profile_transformations_set)
-        flag_value_profile_transformations = value;
-      if (!flag_inline_functions_set)
-        flag_inline_functions = value;
-      if (!flag_ipa_cp_set)
-        flag_ipa_cp = value;
-      if (!flag_ipa_cp_clone_set
-	  && value && flag_ipa_cp)
-	flag_ipa_cp_clone = value;
-      if (!flag_predictive_commoning_set)
-	flag_predictive_commoning = value;
-      if (!flag_unswitch_loops_set)
-	flag_unswitch_loops = value;
-      if (!flag_gcse_after_reload_set)
-	flag_gcse_after_reload = value;
+      set_profile_use (value, false, false);
       break;
 
     case OPT_fprofile_generate_:
@@ -1888,14 +1931,7 @@ common_handle_option (size_t scode, const char *arg, int value,
       sample_data_name = xstrdup (arg);
       /* No break here - do -fsample-profile processing. */
     case OPT_fsample_profile:
-      if (!flag_unroll_loops_set)
-        flag_unroll_loops = value;
-      if (!flag_peel_loops_set)
-        flag_peel_loops = value;
-      if (!flag_tracer_set)
-        flag_tracer = value;
-      if (!flag_inline_functions_set)
-        flag_inline_functions = value;
+      set_profile_use (value, true, false);
       break;
 
     case OPT_fvisibility_:
@@ -1949,6 +1985,15 @@ common_handle_option (size_t scode, const char *arg, int value,
 
     case OPT_fsched_stalled_insns_dep_:
       flag_sched_stalled_insns_dep = value;
+      break;
+
+    case OPT_fsample_profile_aggregate_using_:
+      if (!strcmp (arg, "avg"))
+	flag_sample_profile_aggregate_using = SAMPLE_PROFILE_AGGREGATE_USING_AVG;
+      else if (!strcmp (arg, "max"))
+	flag_sample_profile_aggregate_using = SAMPLE_PROFILE_AGGREGATE_USING_MAX;
+      else
+	warning (0, "unknown sample profile aggregation method \"%s\"", arg);
       break;
 
     case OPT_fstack_check_:
@@ -2072,6 +2117,10 @@ common_handle_option (size_t scode, const char *arg, int value,
       flag_unroll_loops_set = true;
       break;
 
+    case OPT_flimit_hot_components:
+      flag_limit_hot_components_set = true;
+      break;
+
     case OPT_g:
       set_debug_level (NO_DEBUG, DEFAULT_GDB_EXTENSIONS, arg);
       break;
@@ -2096,6 +2145,11 @@ common_handle_option (size_t scode, const char *arg, int value,
     case OPT_gstabs:
     case OPT_gstabs_:
       set_debug_level (DBX_DEBUG, code == OPT_gstabs_, arg);
+      break;
+
+    case OPT_gmlt:
+      set_debug_level (NO_DEBUG, DEFAULT_GDB_EXTENSIONS, "1");
+      generate_debug_line_table = true;
       break;
 
     case OPT_gvms:
@@ -2295,6 +2349,8 @@ set_debug_level (enum debug_info_type type, int extended, const char *arg)
       else if (debug_info_level > 3)
 	error ("debug output level %s is too high", arg);
     }
+
+  generate_debug_line_table = debug_info_level >= DINFO_LEVEL_NORMAL;
 }
 
 /* Return 1 if OPTION is enabled, 0 if it is disabled, or -1 if it isn't
@@ -2389,4 +2445,45 @@ enable_warning_as_error (const char *arg, int value, unsigned int lang_mask)
 	*(int *) cl_options[option_index].flag_var = 1;
     }
   free (new_option);
+}
+
+/* Set FLAG_PROFILE_USE and dependent flags based on VALUE and
+   SAMPLE_PROFILE.  This function is used to handle the
+   -f(no)profile-use and -fsample-profile options as well as to reset
+   flags if a .gcda file is not found.  */
+
+void
+set_profile_use (bool value, bool sample_profile, bool force)
+{
+  if (!sample_profile) 
+    {
+      flag_profile_use = value;
+      if (!flag_branch_probabilities_set || force)
+	flag_branch_probabilities = value;
+      if (!flag_profile_values_set || force)
+	flag_profile_values = value;
+      if (!flag_value_profile_transformations_set || force)
+	flag_value_profile_transformations = value;
+    }
+  if (!flag_unroll_loops_set)
+    flag_unroll_loops = value;
+  if (!flag_peel_loops_set)
+    flag_peel_loops = value;
+  if (!flag_inline_functions_set)
+    flag_inline_functions = value;
+  if (!flag_ipa_cp_set)
+    flag_ipa_cp = value;
+  if (!flag_ipa_cp_clone_set)
+    {
+      if (!flag_ipa_cp_set || flag_ipa_cp)
+	flag_ipa_cp_clone = value;
+    }
+  if (!flag_predictive_commoning_set)
+    flag_predictive_commoning = value;
+  if (!flag_unswitch_loops_set)
+    flag_unswitch_loops = value;
+  if (!flag_gcse_after_reload_set)
+    flag_gcse_after_reload = value;
+  if (!flag_limit_hot_components_set)
+    flag_limit_hot_components = value;
 }

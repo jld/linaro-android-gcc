@@ -18,10 +18,10 @@ foo (int i)
 
 
 int foo2( void ) {
-  int rc;  /* { dg-warning "'rc' is used uninitialized in this function" } */
+  int rc;
   return rc;
   *&rc = 0;
-}
+} /* { dg-warning "'rc' is used uninitialized in this function" } */
 
 extern int printf(const char *, ...);
 void frob(int *pi);

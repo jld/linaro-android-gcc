@@ -1459,10 +1459,16 @@ phi_translate_1 (pre_expr expr, bitmap_set_t set1, bitmap_set_t set2,
 	      continue;
 	    else
 	      {
+                pre_expr leader, result;
+                bitmap temp = BITMAP_ALLOC (&grand_bitmap_obstack);
 		unsigned int op_val_id = VN_INFO (newnary.op[i])->value_id;
-		pre_expr leader = find_leader_in_sets (op_val_id, set1, set2);
-		pre_expr result = phi_translate_1 (leader, set1, set2,
-						   pred, phiblock, seen);
+
+                bitmap_copy (temp, seen);
+		leader = find_leader_in_sets (op_val_id, set1, set2);
+                result = phi_translate_1 (leader, set1, set2,
+                                          pred, phiblock, seen);
+                bitmap_copy (seen, temp);
+                BITMAP_FREE (temp);
 		if (result && result != leader)
 		  {
 		    tree name = get_representative_for (result);
@@ -3153,9 +3159,10 @@ insert_into_preds_of_block (basic_block block, unsigned int exprnum,
       gcc_assert (get_expr_type (ae) == type
 		  || useless_type_conversion_p (type, get_expr_type (ae)));
       if (ae->kind == CONSTANT)
-	add_phi_arg (phi, PRE_EXPR_CONSTANT (ae), pred);
+	add_phi_arg (phi, PRE_EXPR_CONSTANT (ae), pred, UNKNOWN_LOCATION);
       else
-	add_phi_arg (phi, PRE_EXPR_NAME (avail[pred->src->index]), pred);
+	add_phi_arg (phi, PRE_EXPR_NAME (avail[pred->src->index]), pred,
+		     UNKNOWN_LOCATION);
     }
 
   newphi = get_or_alloc_expr_for_name (gimple_phi_result (phi));
@@ -3234,6 +3241,7 @@ do_regular_insertion (basic_block block, basic_block dom)
 	  pre_expr eprime = NULL;
 	  edge_iterator ei;
 	  pre_expr edoubleprime = NULL;
+	  bool do_insertion = false;
 
 	  val = get_expr_value_id (expr);
 	  if (bitmap_set_contains_value (PHI_GEN (block), val))
@@ -3285,6 +3293,10 @@ do_regular_insertion (basic_block block, basic_block dom)
 		{
 		  avail[bprime->index] = edoubleprime;
 		  by_some = true;
+		  /* We want to perform insertions to remove a redundancy on
+		     a path in the CFG we want to optimize for speed.  */
+		  if (optimize_edge_for_speed_p (pred))
+		    do_insertion = true;
 		  if (first_s == NULL)
 		    first_s = edoubleprime;
 		  else if (!pre_expr_eq (first_s, edoubleprime))
@@ -3295,7 +3307,8 @@ do_regular_insertion (basic_block block, basic_block dom)
 	     already existing along every predecessor, and
 	     it's defined by some predecessor, it is
 	     partially redundant.  */
-	  if (!cant_insert && !all_same && by_some && dbg_cnt (treepre_insert))
+	  if (!cant_insert && !all_same && by_some && do_insertion
+	      && dbg_cnt (treepre_insert))
 	    {
 	      if (insert_into_preds_of_block (block, get_expression_id (expr),
 					      avail))
@@ -3857,7 +3870,7 @@ eliminate (void)
     {
       gimple_stmt_iterator i;
 
-      for (i = gsi_start_bb (b); !gsi_end_p (i); gsi_next (&i))
+      for (i = gsi_start_bb (b); !gsi_end_p (i);)
 	{
 	  gimple stmt = gsi_stmt (i);
 
@@ -3915,6 +3928,7 @@ eliminate (void)
 		  propagate_tree_value_into_stmt (&i, sprime);
 		  stmt = gsi_stmt (i);
 		  update_stmt (stmt);
+		  gsi_next (&i);
 		  continue;
 		}
 
@@ -3975,6 +3989,58 @@ eliminate (void)
 		    }
 		}
 	    }
+	  /* If the statement is a scalar store, see if the expression
+	     has the same value number as its rhs.  If so, the store is
+	     dead.  */
+	  else if (gimple_assign_single_p (stmt)
+		   && !is_gimple_reg (gimple_assign_lhs (stmt))
+		   && (TREE_CODE (gimple_assign_rhs1 (stmt)) == SSA_NAME
+		       || is_gimple_min_invariant (gimple_assign_rhs1 (stmt))))
+	    {
+	      tree rhs = gimple_assign_rhs1 (stmt);
+	      tree val;
+	      val = vn_reference_lookup (gimple_assign_lhs (stmt),
+					 shared_vuses_from_stmt (stmt),
+					 true, NULL);
+	      if (TREE_CODE (rhs) == SSA_NAME)
+		rhs = VN_INFO (rhs)->valnum;
+	      if (val
+		  && operand_equal_p (val, rhs, 0))
+		{
+		  def_operand_p def;
+		  use_operand_p use;
+		  vuse_vec_p usevec;
+		  ssa_op_iter oi;
+		  imm_use_iterator ui;
+		  gimple use_stmt;
+
+		  if (dump_file && (dump_flags & TDF_DETAILS))
+		    {
+		      fprintf (dump_file, "Deleted dead store ");
+		      print_gimple_stmt (dump_file, stmt, 0, 0);
+		    }
+
+		  /* Propagate all may-uses to the uses of their defs.  */
+		  FOR_EACH_SSA_VDEF_OPERAND (def, usevec, stmt, oi)
+		    {
+		      tree vuse = VUSE_ELEMENT_VAR (*usevec, 0);
+		      tree vdef = DEF_FROM_PTR (def);
+
+		      /* If the vdef is used in an abnormal PHI node we
+			 have to propagate that flag to the vuse as well.  */
+		      if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (vdef))
+			SSA_NAME_OCCURS_IN_ABNORMAL_PHI (vuse) = 1;
+
+		      FOR_EACH_IMM_USE_STMT (use_stmt, ui, vdef)
+			FOR_EACH_IMM_USE_ON_STMT (use, ui)
+			  SET_USE (use, vuse);
+		    }
+
+		  gsi_remove (&i, true);
+		  release_defs (stmt);
+		  continue;
+		}
+	    }
 	  /* Visit COND_EXPRs and fold the comparison with the
 	     available value-numbers.  */
 	  else if (gimple_code (stmt) == GIMPLE_COND)
@@ -3999,6 +4065,8 @@ eliminate (void)
 		  todo = TODO_cleanup_cfg;
 		}
 	    }
+
+	  gsi_next (&i);
 	}
     }
 
@@ -4220,11 +4288,11 @@ fini_pre (bool do_fre)
    only wants to do full redundancy elimination.  */
 
 static unsigned int
-execute_pre (bool do_fre ATTRIBUTE_UNUSED)
+execute_pre (bool do_fre)
 {
   unsigned int todo = 0;
 
-  do_partial_partial = optimize > 2;
+  do_partial_partial = optimize > 2 && optimize_function_for_speed_p (cfun);
 
   /* This has to happen before SCCVN runs because
      loop_optimizer_init may create new phis, etc.  */
@@ -4308,8 +4376,7 @@ do_pre (void)
 static bool
 gate_pre (void)
 {
-  /* PRE tends to generate bigger code.  */
-  return flag_tree_pre != 0 && optimize_function_for_speed_p (cfun);
+  return flag_tree_pre != 0;
 }
 
 struct gimple_opt_pass pass_pre =

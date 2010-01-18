@@ -1,5 +1,6 @@
 /* PR tree-optimization/20076 */
 /* { dg-do run } */
+/* { dg-xfail-run-if "b/2070963" { { i?86-*-* x86_64-*-* } && { ilp32 } } { "*" } { "" } } */
 
 extern void abort (void);
 

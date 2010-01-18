@@ -1637,6 +1637,7 @@ extern rtx prev_cc0_setter (rtx);
 /* In cfglayout.c  */
 extern int insn_line (const_rtx);
 extern const char * insn_file (const_rtx);
+extern int insn_discriminator (const_rtx);
 extern location_t locator_location (int);
 extern int locator_line (int);
 extern const char * locator_file (int);
@@ -2285,7 +2286,7 @@ extern rtx canon_rtx (rtx);
 extern int true_dependence (const_rtx, enum machine_mode, const_rtx, bool (*)(const_rtx, bool));
 extern rtx get_addr (rtx);
 extern int canon_true_dependence (const_rtx, enum machine_mode, rtx, const_rtx,
-				  bool (*)(const_rtx, bool));
+				  rtx, bool (*)(const_rtx, bool));
 extern int read_dependence (const_rtx, const_rtx);
 extern int anti_dependence (const_rtx, const_rtx);
 extern int output_dependence (const_rtx, const_rtx);

@@ -47,6 +47,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "value-prof.h"
 #include "pointer-set.h"
 #include "tree-inline.h"
+#include "vecprim.h"
 
 /* This file contains functions for building the Control Flow Graph (CFG)
    for a function tree.  */
@@ -81,6 +82,12 @@ static struct cfg_stats_d cfg_stats;
 
 /* Nonzero if we found a computed goto while building basic blocks.  */
 static bool found_computed_goto;
+
+/* Vectors to map a discriminator-enhanced locus to a real locus and
+   discriminator value.  */
+static VEC(int,heap) *discriminator_location_locations = NULL;
+static VEC(int,heap) *discriminator_location_discriminators = NULL;
+location_t min_discriminator_location = UNKNOWN_LOCATION;
 
 /* Hash table to store last discriminator assigned for each locus.  */
 struct locus_discrim_map
@@ -657,6 +664,60 @@ make_edges (void)
   fold_cond_expr_cond ();
 }
 
+/* Associate the DISCRIMINATOR with LOCUS, and return a new locus.
+   We associate discriminators with a locus by allocating location_t
+   values beyond those assigned by libcpp.  Each new value is mapped
+   directly to a real location_t value, and separately to the
+   discriminator.  */
+
+static location_t
+location_with_discriminator (location_t locus, int discriminator)
+{
+  static int next_discriminator_location = 0;
+
+  if (min_discriminator_location == UNKNOWN_LOCATION)
+    {
+      min_discriminator_location = line_table->highest_location + 1;
+      next_discriminator_location = min_discriminator_location;
+    }
+
+  VEC_safe_push (int, heap, discriminator_location_locations, (int) locus);
+  VEC_safe_push (int, heap, discriminator_location_discriminators,
+		 discriminator);
+  return next_discriminator_location++;
+}
+
+/* Return TRUE if LOCUS represents a location with a discriminator.  */
+
+static inline bool
+has_discriminator (location_t locus)
+{
+  return (min_discriminator_location != UNKNOWN_LOCATION
+  	  && locus >= min_discriminator_location);
+}
+
+/* Return the real location_t value for LOCUS.  */
+
+location_t
+map_discriminator_location (location_t locus)
+{
+  if (! has_discriminator (locus))
+    return locus;
+  return (location_t) VEC_index (int, discriminator_location_locations,
+				 locus - min_discriminator_location);
+}
+
+/* Return the discriminator for LOCUS.  */
+
+int
+get_discriminator_from_locus (location_t locus)
+{
+  if (! has_discriminator (locus))
+    return 0;
+  return VEC_index (int, discriminator_location_discriminators,
+		    locus - min_discriminator_location);
+}
+
 /* Trivial hash function for a location_t.  ITEM is a pointer to
    a hash table entry that maps a location_t to a discriminator.  */
 
@@ -727,22 +788,59 @@ same_line_p (location_t locus1, location_t locus2)
           && strcmp (from.file, to.file) == 0);
 }
 
-/* Assign a unique discriminator value to block BB if it begins at the same
-   LOCUS as its predecessor block.  */
+/* Assign a unique discriminator value to instructions in block BB that
+   have the same LOCUS as its predecessor block.  */
 
 static void
 assign_discriminator (location_t locus, basic_block bb)
 {
   gimple first_in_to_bb, last_in_to_bb;
+  int discriminator = 0;
 
-  if (locus == 0 || bb->discriminator != 0)
+  if (locus == UNKNOWN_LOCATION)
     return;
 
+  if (has_discriminator (locus))
+    locus = map_discriminator_location (locus);
+
+  /* Check the locus of the first (non-label) instruction in the block.  */
   first_in_to_bb = first_non_label_stmt (bb);
-  last_in_to_bb = last_stmt (bb);
-  if ((first_in_to_bb && same_line_p (locus, gimple_location (first_in_to_bb)))
-      || (last_in_to_bb && same_line_p (locus, gimple_location (last_in_to_bb))))
-    bb->discriminator = next_discriminator_for_locus (locus);
+  if (first_in_to_bb)
+    {
+      location_t first_locus = gimple_location (first_in_to_bb);
+      if (! has_discriminator (first_locus)
+	  && same_line_p (locus, first_locus))
+	discriminator = next_discriminator_for_locus (locus);
+    }
+
+  /* If the first instruction doesn't trigger a discriminator, check the
+     last instruction of the block.  This catches the case where the
+     increment portion of a for loop is placed at the end of the loop
+     body.  */
+  if (discriminator == 0)
+    {
+      last_in_to_bb = last_stmt (bb);
+      if (last_in_to_bb)
+	{
+	   location_t last_locus = gimple_location (last_in_to_bb);
+	   if (! has_discriminator (last_locus)
+	       && same_line_p (locus, last_locus))
+	     discriminator = next_discriminator_for_locus (locus);
+	}
+    }
+
+  if (discriminator != 0)
+    {
+      location_t new_locus = location_with_discriminator (locus, discriminator);
+      gimple_stmt_iterator gsi;
+
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	{
+	  gimple stmt = gsi_stmt (gsi);
+	  if (same_line_p (locus, gimple_location (stmt)))
+	    gimple_set_location (stmt, new_locus);
+	}
+    }
 }
 
 /* Create the edges for a GIMPLE_COND starting at block BB.  */
@@ -2871,7 +2969,7 @@ reinstall_phi_args (edge new_edge, edge old_edge)
  
       gcc_assert (result == gimple_phi_result (phi));
   
-      add_phi_arg (phi, arg, new_edge);
+      add_phi_arg (phi, arg, new_edge, redirect_edge_var_map_location (vm));
     }
   
   redirect_edge_var_map_clear (old_edge);
@@ -4756,7 +4854,8 @@ gimple_make_forwarder_block (edge fallthru)
       new_phi = create_phi_node (var, bb);
       SSA_NAME_DEF_STMT (var) = new_phi;
       gimple_phi_set_result (phi, make_ssa_name (SSA_NAME_VAR (var), phi));
-      add_phi_arg (new_phi, gimple_phi_result (phi), fallthru);
+      add_phi_arg (new_phi, gimple_phi_result (phi), fallthru, 
+		   UNKNOWN_LOCATION);
     }
 
   /* Add the arguments we have stored on edges.  */
@@ -5153,7 +5252,8 @@ add_phi_args_after_copy_edge (edge e_copy)
       phi = gsi_stmt (psi);
       phi_copy = gsi_stmt (psi_copy);
       def = PHI_ARG_DEF_FROM_EDGE (phi, e);
-      add_phi_arg (phi_copy, def, e_copy);
+      add_phi_arg (phi_copy, def, e_copy, 
+		   gimple_phi_arg_location_from_edge (phi, e));
     }
 }
 
@@ -7004,7 +7104,7 @@ gimple_lv_adjust_loop_header_phi (basic_block first, basic_block second,
       phi1 = gsi_stmt (psi1);
       phi2 = gsi_stmt (psi2);
       def = PHI_ARG_DEF (phi2, e2->dest_idx);
-      add_phi_arg (phi1, def, e);
+      add_phi_arg (phi1, def, e, gimple_phi_arg_location_from_edge (phi2, e2));
     }
 }
 

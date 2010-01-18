@@ -10,11 +10,11 @@ implicit none
 
 contains
 
-  function baz(arg) result(res) ! { dg-warning "res.yr' may be" }
+  function baz(arg) result(res) ! { dg-warning "res.yr' may be" "" { target { ilp32 } } }
     type(bar), intent(in) :: arg
     type(bar) :: res
     logical, external:: some_func
-    if (.not. some_func(arg)) then
+    if (.not. some_func(arg)) then ! { dg-warning "res.yr' may be" "" { target { lp64 } } }
       call fatal('arg not valid')
     else
       res = arg

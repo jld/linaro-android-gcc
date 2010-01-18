@@ -3,5 +3,5 @@
 static inline int f()
 {
 	int i;
-	return i;
+	return i + 1;
 }

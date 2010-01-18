@@ -1,7 +1,6 @@
 // PR tree-optimization/39557
 // invalid post-dom info leads to infinite loop
-// { dg-do run }
-// { dg-options "-Wall -fno-exceptions -O2 -fprofile-use -fno-rtti" }
+// { dg-options "-Wall -fno-exceptions -O2 -fno-rtti" }
 
 struct C
 {
@@ -49,4 +48,4 @@ main ()
 {
  E e;
  e.bar ();
-} // { dg-message  "note: file" "" }
+}

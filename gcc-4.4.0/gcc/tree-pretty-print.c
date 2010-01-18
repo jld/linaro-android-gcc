@@ -448,6 +448,7 @@ dump_generic_node (pretty_printer *buffer, tree node, int spc, int flags,
   if ((flags & TDF_LINENO) && EXPR_HAS_LOCATION (node))
     {
       expanded_location xloc = expand_location (EXPR_LOCATION (node));
+      int discriminator = get_discriminator_from_locus (EXPR_LOCATION (node));
       pp_character (buffer, '[');
       if (xloc.file)
 	{
@@ -455,6 +456,11 @@ dump_generic_node (pretty_printer *buffer, tree node, int spc, int flags,
 	  pp_string (buffer, " : ");
 	}
       pp_decimal_int (buffer, xloc.line);
+      if (discriminator)
+	{
+	  pp_string (buffer, " discrim ");
+	  pp_decimal_int (buffer, discriminator);
+	}
       pp_string (buffer, "] ");
     }
 

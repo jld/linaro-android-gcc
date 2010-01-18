@@ -6,8 +6,8 @@ checkins, keep them separate.
 
 Append new entries to the end of this file. Each entry shall include:
  * The list of files modified by the patch,
- * The status of the patch (whether it's been checked in upstream,
-   or is a local patch),
+ * The status of the patch (already upstream (indicate upstream revision),
+   not yet upstream, or not applicable upstream (google local).
  * The local 'owner' responsible for the patch, and
  * A description of the patch (preferably including bug numbers).
 
@@ -122,7 +122,7 @@ gcc/gcov-io.c
   http://b/1302008
   Do not open gcda/gcno files in write mode unnecessarily.
   Owner: nvachhar
-  Status: not yet upstream
+  Status: Upstream in svn revision r152419
 
 gcc/config/i386/chkstk.asm
 gcc/config/i386/cygwin.asm
@@ -163,7 +163,7 @@ gcc/varasm.c
   Add -gdwarf-4 option to enable use of COMDAT sections for debug type
   information.
   Owner: ccoutant
-  Status: in dwarf-4 branch upstream
+  Status: in dwarf-4 branch upstream; in mainline at rev 152421.
 
 gcc/gcov.c
   Fix a compilation issue in the gcov patch that caused bootstrapping to fail
@@ -226,7 +226,7 @@ gcc/builtins.c
   Add a language-independent parameter "builtin-prefetch-override" to 
   disable the code expansion for __builtin_prefetch().
   Owner: nvachhar
-  Status: not yet upstream
+  Status: will not send upstream (do not port to future Crosstools)
 
 gcc/tree-ssa.c
 gcc/dominance.c
@@ -356,7 +356,7 @@ gcc/tree-pass.h
   Port the plugin support from the external GCC 'plugins' branch to the
   v13 tree. This CL contains GCC patch 144439 and 144758.
   Owner: lcwu
-  Status: in the external GCC 'plugins' branch.
+  Status: submitted upstream for the 4.5 release.
 
 gcc/configure.ac
 gcc/gcc.c
@@ -388,7 +388,7 @@ gcc/value-prof.c
   Fix a bug in gimple_stringop_fixed_value where it assumed all
   stringops have 3 arguments, even though bzero only has two.
   Owner: nvachhar
-  Status: not yet upstream
+  Status: Upstream in svn revision 151864.
   
 gcc/value-prof.c
     Add TYPE_MODE check for icall target.
@@ -462,7 +462,7 @@ gcc/testsuite/lib/target-supports.exp
   Enhance the dejagnu infrastructure to support testing of the plugin
   mechanism. Also add a couple of new plugin testcases.
   Owner: lcwu
-  Status: in the external plugins branch (patch 145075 and 145458).
+  Status: submitted upstream.  To be released with 4.5.
 
 Makefile.tpl
 configure
@@ -608,7 +608,7 @@ gcc/tree-ssa-lrs.c
 gcc/Makefile.in
   Fix tree-pass.h installation.
   Owner: espindola
-  Status: local
+  Status: google-local patch.
 
 gcc/config/arm/eabi.h
 gcc/config/arm/eabi.opt
@@ -732,7 +732,7 @@ gcc/optabs.c
 gcc/optabs.h
   If-convert statements of the form 'if (val <0) valnot = ~val;'
   Owner: eraman
-  Status: Not in mainline yet
+  Status: In GCC mainline at 152253.
 
 gcc/ipa-inline.c
   Increase verbosity of inlining dumps.
@@ -781,7 +781,7 @@ gcc/recog.c
 gcc/ifcvt.c:
   Fix an uninitialized variable bug in noce_try_abs introduced by CL 29955.
   Owner: eraman
-  Status: This change and CL 29955 will be pushed upstream.
+  Status: In GCC mainline at 152253.
 
 gcc/config/i386/i386.c
   Fix for failing g++.dg/eh/async-unwind1.C introduced by mainline 147995,
@@ -1025,14 +1025,14 @@ libstdc++-v3/include/ext/vstring.h
   Various debug checks, controlled by
   __google_stl_debug_{vector,string} macros.
   Owner : ppluzhnikov
-  Status: local.
+  Status: google-local patch.
 
 libstdc++-v3/include/bits/stl_algo.h
 libstdc++-v3/include/bits/stl_tree.h
   Check for strict weak ordering, controlled by
   __google_stl_debug_{rbtree,compare} macros.
   Owner: ppluzhnikov
-  Status: local
+  Status: google-local patch.
 
 gcc/dwarf2out.c
   Apply upstream fix for http://b/1949954
@@ -1043,12 +1043,12 @@ gcc/testsuite/gcc.dg/tree-prof/val-prof-7.c
   Fix test so that it works on x86 and x86_64.  Remove XFAIL since the
   test passes and is supposed to pass.
   Owner: nvachhar
-  Status: Not yet upstream.
+  Status: Upstream in svn revision 151864.
 
 gcc/testsuite/gcc.dg/tree-prof/val-prof-7.c
   Fix test so that it works regardless of mtune settings.
   Owner: nvachhar
-  Status: Not yet upstream.
+  Status: Upstream in svn revision 151864.
 
 gcc/config/arm/arm.h
   Backport upstream fix that add PACK support to arm platforms.
@@ -1267,7 +1267,7 @@ gcc/gcc.c
   Fix 2031001.
   Don't search /usr/libexec/gcc and /usr/lib/gcc.
   Owner: espindola
-  Status: Being reviewed upstream.
+  Status: In gcc 4.5 at revision 151054.
 
 gcc/cgraph.h
 gcc/common.opt
@@ -1343,3 +1343,889 @@ gcc/dwarf2out.c
   "unworthy" types.
   Owner: ccoutant
   Status: backported from dwarf-4 branch at revision 150574.
+
+gcc/convert.c
+gcc/testsuite/g++.dg/parse/cond5.C
+  Apply upstream (4.4-branch) change 149123:
+    [gcc/ChangeLog]
+    2009-06-30  Jakub Jelinek  <jakub@redhat.com>
+      PR c++/40566
+      * convert.c (convert_to_integer) <case COND_EXPR>: Don't convert
+      to type arguments that have void type.
+    [gcc/testsuite/ChangeLog]
+    2009-06-30  Jakub Jelinek  <jakub@redhat.com>
+      PR c++/40566
+      * g++.dg/parse/cond5.C: New test.
+  Owner: cgd
+  Status: Backported from upstream rev. 149123.
+
+gcc/stmt.c
+gcc/testsuite/gcc.dg/Wunused-value-3.c
+  Apply upstream (4.4-branch) change 146812:
+    [gcc/ChangeLog]
+    2009-04-26  Jakub Jelinek  <jakub@redhat.com>
+      PR c/39889
+      * stmt.c (warn_if_unused_value): Look through NON_LVALUE_EXPR.
+    [gcc/testsuite/ChangeLog]
+    2009-04-26  Jakub Jelinek  <jakub@redhat.com>
+      PR c/39889
+      * gcc.dg/Wunused-value-3.c: New test.
+  Owner: cgd
+  Status: Backported from upstream rev. 146812.
+
+gcc/dse.c
+gcc/testsuite/gcc.c-torture/compile/pr40035.c
+  Apply upstream (4.4-branch) change 147501:
+    [gcc/ChangeLog]
+    2009-05-14  Ben Elliston <bje@au.ibm.com>
+      Backport from mainline:
+      2009-05-14  Jakub Jelinek  <jakub@redhat.com>
+                  Ben Elliston <bje@au.ibm.com>
+      PR middle-end/40035
+      * dse.c (check_mem_read_rtx): Guard against width == -1.
+    [gcc/testsuite/ChangeLog]
+    2009-05-14  Ben Elliston  <bje@au.ibm.com>
+      Backport from mainline:
+      2009-05-14  Ben Elliston  <bje@au.ibm.com> 
+      PR middle-end/40035
+      * gcc.c-torture/compile/pr40035.c: New test.
+  Owner: cgd
+  Status: Backported from upstream rev. 147501.
+
+gcc/gimplify.c
+gcc/testsuite/g++.dg/warn/Wuninitialized-4.C
+gcc/testsuite/g++.dg/warn/Wuninitialized-5.C
+gcc/testsuite/gcc.dg/pr39666-1.c
+gcc/testsuite/gcc.dg/pr39666-2.c
+gcc/testsuite/gfortran.dg/pr39666-1.f90
+gcc/testsuite/gfortran.dg/pr39666-2.f90
+  Apply upstream (4.4-branch) change 147440:
+    [gcc/ChangeLog]
+    2009-05-12  Jakub Jelinek  <jakub@redhat.com>
+      Backport from mainline:
+      2009-05-05  Jakub Jelinek  <jakub@redhat.com>
+      PR middle-end/39666
+      * gimplify.c (gimplify_switch_expr): If case labels cover the whole
+      range of the type, but default label is missing, add it with one
+      of the existing labels instead of adding a new label for it.
+    [gcc/testsuite/ChangeLog]
+    2009-05-12  Jakub Jelinek  <jakub@redhat.com>
+      Backport from mainline:
+      2009-05-05  Jakub Jelinek  <jakub@redhat.com>
+      PR middle-end/39666
+      * gcc.dg/pr39666-1.c: New test.
+      * gcc.dg/pr39666-2.c: Likewise.
+      * g++.dg/warn/Wuninitialized-4.C: Likewise.
+      * g++.dg/warn/Wuninitialized-5.C: Likewise.
+      * gfortran.dg/pr39666-1.f90: Likewise.
+      * gfortran.dg/pr39666-2.f90: Likewise.
+  Owner: cgd
+  Status: Backported from upstream rev. 147440.
+
+gcc/cgraph.h
+gcc/common.opt
+gcc/ipa-inline.c
+gcc/opts.c
+gcc/params.def
+  Implement heuristic which limits i-cache footprint during inlining.  The size
+  of hot components of the call graph are limited to a parameterized value.
+  Heuristic is enabled by default with FDO, and can be explicitly enabled/disabled
+  with -flimit-hot-components.
+
+  Owner: meheff
+  Status: Not yet upstream
+
+gcc/ipa-utils.h
+gcc/tree.h
+  Apply upstream (4.4-branch) change 147536:
+    [gcc/ChangeLog]
+    2009-05-14  H.J. Lu  <hongjiu.lu@intel.com>
+      Backport from mainline:
+      2009-05-14  H.J. Lu  <hongjiu.lu@intel.com>
+      PR middle-end/40147
+      * ipa-utils.h (memory_identifier_string): Moved to ...
+      * tree.h (memory_identifier_string): Here.  Add GTY(()).
+  Owner: cgd
+  Status: Backported from upstream rev. 147536.
+
+gcc/gimple.h
+gcc/tree-ssa-sccvn.c
+gcc/testsuite/gcc.c-torture/compile/pr39999.c
+  Apply upstream (4.4-branch) change 147657:
+    [gcc/ChangeLog]
+    2009-05-18  Richard Guenther  <rguenther@suse.de>
+      PR tree-optimization/39999
+      * gimple.h (gimple_expr_type): Use the expression type looking
+      through useless conversions.
+      * tree-ssa-sccvn.c (vn_nary_op_lookup_stmt): Use gimple_expr_type.
+      (vn_nary_op_insert_stmt): Likewise.
+      (simplify_binary_expression): Likewise.
+    [gcc/testsuite/ChangeLog]
+    2009-05-18  Richard Guenther  <rguenther@suse.de>
+      PR tree-optimization/39999
+      * gcc.c-torture/compile/pr39999.c: New testcase.
+  Owner: cgd
+  Status: Backported from upstream rev. 147657.
+
+gcc/tree-ssa-operands.c
+gcc/testsuite/g++.dg/torture/pr40389.C
+  Apply upstream (4.4-branch) change 148601:
+    [gcc/ChangeLog]
+    2009-06-17  Richard Guenther  <rguenther@suse.de>
+      PR middle-end/40389
+      * tree-ssa-operands.c (parse_ssa_operands): Add NRV results
+      to the addresses taken bitmap.
+    [gcc/testsuite/ChangeLog]
+    2009-06-17  Richard Guenther  <rguenther@suse.de>
+      PR middle-end/40389
+      * g++.dg/torture/pr40389.C: New testcase.
+  Owner: cgd
+  Status: Backported from upstream rev. 148601.
+
+gcc/alias.c
+gcc/rtl.h
+gcc/cse.c
+gcc/cselib.c
+gcc/gcse.c
+gcc/dse.c
+gcc/testsuite/gcc.dg/pr39794.c
+  Apply upstream (4.4-branch) change 146834.
+    [gcc/ChangeLog]
+    2009-04-27  Jakub Jelinek  <jakub@redhat.com>
+       PR rtl-optimization/39794
+        * alias.c (canon_true_dependence): Add x_addr argument.
+        * rtl.h (canon_true_dependence): Adjust prototype.
+        * cse.c (check_dependence): Adjust canon_true_dependence callers.
+        * cselib.c (cselib_invalidate_mem): Likewise.
+        * gcse.c (compute_transp): Likewise.
+        * dse.c (scan_reads_nospill): Likewise.
+        (record_store, check_mem_read_rtx): Likewise.  For non-const-or-frame
+        addresses pass base->val_rtx as mem_addr, for const-or-frame addresses
+        canon_base_addr of the group, plus optional offset.
+        (struct group_info): Rename canon_base_mem to
+        canon_base_addr.
+        (get_group_info): Set canon_base_addr to canon_rtx of base, not
+        canon_rtx of base_mem.
+    [gcc/testsuite/ChangeLog]
+    2009-04-27  Jakub Jelinek  <jakub@redhat.com>
+        PR rtl-optimization/39794
+        * gcc.dg/pr39794.c: New test.
+  Owner: eraman
+  Status: Backported from upstream rev. 146834.
+
+gcc/tree-ssa-phiprop.c
+gcc/testsuite/gcc.c-torture/execute/pr40002.c
+  Apply upstream (4.4-branch) change 147153:
+    [gcc/ChangeLog]
+    2009-05-06  Richard Guenther  <rguenther@suse.de>
+      PR tree-optimization/40022
+        * tree-ssa-phiprop.c (phivn_valid_p): Fix tuplification error.
+        * gcc.c-torture/execute/pr40022.c: New testcase.
+  Owner: nvachhar
+  Status: Backported from upstream rev. 147153.
+
+gcc/tree-ssa-loop-niter.c
+gcc/testsuite/gcc.dg/tree-ssa/pr40087.c
+  Apply upstream (4.4-branch) change 147806
+    [gcc/ChangeLog]
+    2009-05-22  Zdenek Dvorak  <ook@ucw.cz>
+      PR tree-optimization/40087
+        * tree-ssa-loop-niter.c (number_of_iterations_ne_max,
+        number_of_iterations_ne): Rename never_infinite argument.
+        (number_of_iterations_lt_to_ne, number_of_iterations_lt,
+        number_of_iterations_le): Handle pointer-type ivs when
+        exit_must_be_taken is false.
+        (number_of_iterations_cond):  Do not always assume that
+        exit_must_be_taken if the control variable is a pointer.
+  Owner: nvachhar
+  Status: Backported from upstream rev 147806
+
+gcc/final.c
+  Avoid garbage collecting the memory used by -fdebug-prefix-map.
+  Owner: espindola
+  Status: Backported from upstream revision 150759.
+
+Makefile.def
+Makefile.in
+Makefile.tpl
+config/bootstrap-O1.mk
+config/bootstrap-O3.mk
+config/bootstrap-debug.mk
+config/mt-gnu
+config/multi.m4
+gcc/doc/install.texi
+gcc/java/Make-lang.in
+libjava/configure
+libjava/configure.ac
+  Port revion 147415. This passes -fdebug-prefix-map to stages
+  2 and 3. Fixes bug 2045437.
+  Owner: espindola
+  Status: Backported from upstream revision 147415.
+
+gcc/dyn-ipa.c
+gcc/tree-ssa-lrs.c
+  Fix to 2051043 
+  Owner: davidxl
+  Status: submitted to lw-ipo branch
+
+gcc/tree-ssa-lrs.c
+  Fix to 2056091
+  Owner: davidxl
+  Status: not submitted
+
+gcc/dwarf2out.c
+  Backport upstream patch to fix ICE in output_die (b/1906960, PR debug/41063).
+  http://gcc.gnu.org/ml/gcc-patches/2009-08/msg00799.html
+  Owner: ccoutant
+  Status: in gcc mainline at rev 151187.
+
+gcc/calls.c
+gcc/common.opt
+gcc/dbxout.c
+gcc/debug.c
+gcc/debug.h
+gcc/dwarf2out.c
+gcc/final.c
+gcc/sdbout.c
+gcc/vmsdbgout.c
+gcc/testsuite/g++.dg/debug/dwarf2/icf.C
+  Add support for debugging with identical code folding (ICF).
+  Backport of upstream patch.
+  Owner: ccoutant
+  Status: in gcc mainline at rev 152577.
+
+libstdc++-v3/testsuite/23_containers/vector/requirements/dr438/assign_neg.cc
+libstdc++-v3/testsuite/23_containers/vector/requirements/dr438/constructor_1_neg.cc
+libstdc++-v3/testsuite/23_containers/vector/requirements/dr438/constructor_2_neg.cc
+libstdc++-v3/testsuite/23_containers/vector/requirements/dr438/insert_neg.cc
+  Fix for http://b/2056182 -- adjust expected failure line numbers to match
+  local change in http://cl/31102-p2.
+  Owner: ppluzhnikov
+  Status: google-local patch.
+
+gcc/c-opts.c
+gcc/common.opt
+gcc/coverage.c
+gcc/doc/invoke.texi
+gcc/dyn-ipa.c
+gcc/gcov-io.c
+gcc/gcov-io.h
+gcc/opts.c
+gcc/opts.h
+  Handle module groups with mismatching GCC command line options.
+  Owner: raksit
+  Status: submitted upstream to lw-ipo branch as r150867.
+
+gcc/dojump.c
+gcc/fold-const.c
+gcc/testsuite/gcc.c-torture/compile/pr40204.c
+gcc/testsuite/gcc.c-torture/execute/pr40057.c
+gcc/testsuite/gcc.c-torture/execute/pr40747.c
+gcc/testsuite/gcc.dg/pr39867.c
+gcc/testsuite/gcc.dg/torture/pr39855.c
+  Apply upstream (4.4-branch) revisions 146622, 146702, 147242,
+  149681 and 147750.
+  Owner: dnovillo.
+  Status: Backported from upstream.
+
+gcc/dwarf2out.c
+  Backport upstream patch to fix htab usage where slot pointer is kept alive
+  across a call that may expand the hash table.
+  Owner: ccoutant
+  Status: Backported from dwarf4 branch at revision 150912.
+
+gcc/tree-ssa-lrs.c
+  Add missing RD update
+  Owner: davidxl
+  Status: not submitted
+
+gcc/dwarf2out.c
+  Backport upstream patch to fix invalid use of DW_OP_regx in DWARF info
+  (b/1560232).
+  Owner: ccoutant
+  Status: Backported from upstream revision 147187.
+
+gcc/tree-profile.c
+  Make __gcov_indirect_call_counters and __gcov_indirect_call_callee
+  TLS to avoid race conditions in value profiling.
+  Owner: nvachhar
+  Status: Upstream in rev 142953, but reverted due to problems on Darwin.
+ 
+gcc/Makefile.in
+  Backport upstream patch to add tree-ssa-sccvn.h and incpath.h
+  to PLUGIN_HEADERS.
+  Owner: dnovillo
+  Status: In mainline rev 150967.
+
+gcc/cfgexpand.c
+gcc/gimple-pretty-print.c
+gcc/graphite.c
+gcc/ipa-struct-reorg.c
+gcc/lambda-code.c
+gcc/omp-low.c
+gcc/tree-cfg.c
+gcc/tree-cfgcleanup.c
+gcc/tree-flow-inline.h
+gcc/tree-flow.h
+gcc/tree-inline.c
+gcc/tree-into-ssa.c
+gcc/tree-loop-distribution.c
+gcc/tree-outof-ssa.c
+gcc/tree-parloops.c
+gcc/tree-phinodes.c
+gcc/tree-predcom.c
+gcc/tree-ssa-loop-manip.c
+gcc/tree-ssa-phiopt.c
+gcc/tree-ssa-phiprop.c
+gcc/tree-ssa-pre.c
+gcc/tree-ssa-threadupdate.c
+gcc/tree-ssa.c
+gcc/tree-switch-conversion.c
+gcc/tree-tailcall.c
+gcc/tree-vect-transform.c
+gcc/tree-vectorizer.c
+gcc/tree.h
+  Backport of upstream patch to track debug locus information in PHI
+  node arguments.
+  Owner: ccoutant
+  Status: Backport from upstream at 150267.
+
+gcc/final.c
+  Provide a (Google-internal) documentation reference to help people cope
+  with stack frame size warnings.
+  Owner: cgd
+  Status: local change.
+
+gcc/testsuite/gcc.dg/tree-ssa/ltrans-1.c
+gcc/testsuite/gcc.dg/tree-ssa/ltrans-3.c
+gcc/testsuite/gcc.dg/tree-ssa/ltrans-4.c
+gcc/testsuite/gcc.dg/tree-ssa/ltrans-5.c
+gcc/testsuite/gcc.dg/tree-ssa/ltrans-6.c
+gcc/testsuite/gcc.dg/tree-ssa/ltrans-8.c
+gcc/testsuite/gcc.dg/tree-ssa/vrp47.c
+gcc/testsuite/gfortran.dg/ltrans-7.f90
+  Undo change marking these tests XFAIL.  They are not expected
+  to fail in a native configuration (and don't seem to).
+  Owner: cgd
+  Status: Local.
+
+gcc/testsuite/gcc.dg/torture/stackalign/builtin-apply-4.c
+  Mark as XFAIL due to http://b/2070963
+  Owner: cgd
+  Status: Local.
+
+gcc/testsuite/gfortran.dg/PR19754_2.f90
+gcc/testsuite/gfortran.dg/array_reference_1.f90
+gcc/testsuite/gfortran.dg/elemental_subroutine_7.f90
+gcc/testsuite/gfortran.dg/intrinsic_modulo_1.f90
+gcc/testsuite/gfortran.dg/streamio_9.f90
+  Mark as XFAIL (excluding -O0, -O1, -O2, and -Os) due to http://b/2071024
+  Owner: cgd
+  Status: Reverted by later change.
+
+libstdc++-v3/testsuite/26_numerics/headers/cmath/c99_classification_macros_c.cc
+  Un-XFAIL this test for linux.
+  Owner: cgd
+  Status: Local.
+
+gcc/config.gcc
+gcc/config/i386/linux.h
+gcc/config/i386/linux64.h
+gcc/config/linux-grtev1.h
+  When using GRTE and linking statically, instead of just -lc link:
+    -lc -lnss_borg -lnss_cache -lnss_dns -lnss_files -lresolv
+  Owner: cgd
+  Status: local
+
+libmudflap/testsuite/libmudflap.c++/pass41-frag.cxx
+  Force test to use -O when building for i?86 and x86_64 to work
+  around an expected failure.
+  Owner: cgd
+  Status: local
+
+gcc/gcc.c
+  Search all -B paths (with and without multilib dirs) before processing
+  lower-priority paths.
+  Owner: cgd
+  Status: not yet upstream.
+
+gcc/cp/decl2.c
+  Don't emit auxiliary module functions (don't mark then as referenced), even
+  if they have static variables.
+  Owner: raksit
+  Status: submitted upstream to lw-ipo branch as r151076.
+
+gcc/opts.c
+  Don't record -fripa-disallow-opt-mismatch and -Wripa-opt-mismatch  in gcda file.
+  Owner: davidxl
+  Status: submitted to lw-ipo branch
+
+gcc/toplev.c
+  Handle '%E' format in default_tree_printer.  From:
+  http://gcc.gnu.org/ml/gcc-patches/2008-11/msg01115.html
+  Owner: cgd
+  Status: backported from trunk r146294.
+
+gcc/dyn-ipa.c
+gcc/opts.c
+gcc/common.opt
+gcc/tree-ssa-lrs.c
+gcc/doc/invoke.texi
+  Add more statistic dumping in DYN-IPA
+  Add an option to control LRS
+  Owner: davidxl
+  Status: dyn-ipa.c change is in upstream lw-ipo branch.
+
+config/i386/i386.c
+gcc/testsuite/gfortran.dg/PR19754_2.f90
+gcc/testsuite/gfortran.dg/array_reference_1.f90
+gcc/testsuite/gfortran.dg/elemental_subroutine_7.f90
+gcc/testsuite/gfortran.dg/intrinsic_modulo_1.f90
+gcc/testsuite/gfortran.dg/streamio_9.f90
+  Undo local XFAIL markings on tests above.  Fix root cause of the failures:
+  incorrect use of SSE2 vector instructions when SSE2 isn't enabled.
+  Owner: cgd
+  Status: Backported from upstream 4.4-branch rev 151275.
+
+gcc/cp/decl.c
+gcc/testsuite/g++.dg/warn/Wreturn-type-6.C
+  Do not suppress warning about functions with no return statement for
+  functions with a qualified return type.
+  Owner: cgd
+  Status: Backported from upstream 4.4-branch rev 150099.
+
+libcpp/macro.c
+gcc/testsuite/gcc.dg/20090902-1.c
+  Apply upstream change @151343 to fix wide char stringification.
+  Owner: ppluzhnikov
+  Status: Upstream change 151343.
+
+gcc/c-opts.c
+  Fix b2074282
+  Owner: davidxl
+  Status: in lw-ipo branch
+
+gcc/ifcvt.c
+  Fix 2097122
+  Owner: davidxl
+  Status: not submitted
+
+gcc/cp/decl.c
+gcc/dbxout.c
+gcc/debug.c
+gcc/debug.h
+gcc/dwarf2out.c
+gcc/sdbout.c
+gcc/vmsdbgout.c
+  Apply upstream change to fix b/1279996 (missing debug info for typedef
+  of anonymous struct).
+  http://gcc.gnu.org/ml/gcc-patches/2009-02/msg00749.html
+  http://gcc.gnu.org/ml/gcc-patches/2009-04/msg01386.html
+  Owner: ccoutant
+  Status: Backported from upstream changes at revs 146137 and 146290.
+
+gcc/common.opt
+gcc/gimplify.c
+gcc/tree-vrp.c
+gcc/testsuite/g++.dg/other/no-strict-enum-precision-1.C
+gcc/testsuite/g++.dg/other/no-strict-enum-precision-2.C
+gcc/testsuite/g++.dg/other/no-strict-enum-precision-3.C
+  Implement -fno-strict-enum-precision.  Fix root cause of bug 2077625.
+  Owner: rus.
+  Status: not yet upstream.
+
+gcc/cp/cp-objcp-common.c
+  Change which builtins we save/restore post-parsing. This fixes a LIPO
+  cfg-checksum mismatch problem.
+  Owner: raksit
+  Status: Submitted upstream to lw-ipo branch as r151615.
+
+gcc/c-opts.c
+gcc/testsuite/gcc.dg/cpp/missing-header-MD.c
+gcc/testsuite/gcc.dg/cpp/missing-header-MMD.c
+gcc/testsuite/gcc.dg/cpp/missing-sysheader-MD.c
+gcc/testsuite/gcc.dg/cpp/missing-sysheader-MMD.c
+libcpp/files.c
+libcpp/include/cpplib.h
+  When using -MMD, treat missing system headers as errors so that no
+  output is generated.  http://b/1954331
+  Owner: cgd
+  Status: Upstream (trunk) changes 151879 and 151894.
+
+gcc/testsuite/gcc.misc-tests/linkage.exp
+  Fixes the test where the built gcc is 32-bit but the platform C compiler
+  defaults to 64-bit compilation.
+  Owner: simonb
+  Status: not yet upstream.
+
+gcc/coverage.c
+gcc/opts.c
+gcc/opts.h
+  Disable -fprofile-use when no .gcda file is found.
+  Owner: nvachhar
+  Status: not yet upstream.
+
+gcc/testsuite/g++.dg/tree-prof/dom-invalid.C
+gcc/testsuite/g++.dg/tree-ssa/dom-invalid.C
+gcc/testsuite/gcc.dg/pr26570.c
+gcc/testsuite/gcc.dg/pr32773.c
+gcc/testsuite/gcc.dg/tree-prof/pr26570.c
+gcc/testsuite/gcc.dg/tree-prof/pr32773.c
+  Make tests work given that -fprofile-use does nothing with missing
+  .gcda files.
+  Owner: nvachhar
+  Status: not yet upstream
+
+gcc/coverage.c
+  Avoid ICE if the working directory does not exist.
+  Owner: nvachhar
+  Status: not yet upstream
+
+ltoptions.m4
+boehm-gc/configure
+gcc/configure
+libffi/configure
+libgfortran/configure
+libgomp/configure
+libjava/classpath/configure
+libjava/configure
+libmudflap/configure
+libobjc/configure
+libssp/configure
+libstdc++-v3/configure
+zlib/configure
+  Modify the --with-pic configuration option to accept a list of library names.
+  In this mode, the specified libraries are built with PIC, whereas all other
+  libraries are built with the default mode.
+  Owner: aaw
+  Status: not yet upstream
+
+gcc/doc/cpp.texi
+libcpp/directives.c
+  Do not list #ident and #sccs as deprecated.
+  Owner: nvachhar
+  Status: Backported from upstream r152612
+
+gcc-4.4.0/gcc/testsuite/gfortran.dg/argument_checking_13.f90
+  Work around test that is flaky in the nightly build.
+  Owner: cgd
+  Status: local
+
+gcc/coverage.c
+gcc/cp/cp-objcp-common.c
+  Revert an earlier patch that fixes cfg-checksum mismatches as its now
+  causing more mismatches than it fixes. Also disable the "no coverage found"
+  warning in lipo mode for now -- a proper fix will have to wait for v13
+  patch release.
+  Owner: raksit
+  Status: These are workarounds for bugs that should be fixed in the patch
+  release -- so these won't be submitted upstream.
+
+gcc/Makefile.in
+  Backport from mainline rev. 153472.  Add real.h, output.h and
+  $(IPA_UTILS_H) to the list of file exported in PLUGIN_HEADERS.
+  Owner: dnovillo
+  Status: In gcc mainline rev. 153472.
+
+gcc/tree-ssa-pre.c
+gcc/tree-ssa-sccvn.c
+gcc/testsuite/g++.dg/warn/Warray-bounds.C
+gcc/testsuite/gcc.dg/Warray-bounds.c
+gcc/testsuite/gcc.dg/tree-ssa/ssa-dse-11.c
+gcc/testsuite/gcc.dg/tree-ssa/ssa-fre-21.c
+gcc/testsuite/gcc.dg/tree-ssa/ssa-pre-26.c
+gcc/testsuite/gcc.dg/vect/slp-widen-mult-s16.c
+gcc/testsuite/gcc.dg/vect/slp-widen-mult-u8.c
+gcc/testsuite/gcc.dg/vect/vect-35.c
+gcc/testsuite/gcc.dg/vect/vect-multitypes-16.c
+gcc/testsuite/gcc.dg/vect/vect-multitypes-17.c
+gcc/testsuite/gcc.dg/vect/vect-reduc-dot-u8a.c
+gcc/testsuite/gcc.dg/vect/vect-reduc-dot-u8b.c
+gcc/testsuite/gcc.dg/vect/wrapv-vect-reduc-dot-s8b.c
+  Remove redundant store and enable pre for -Os when it won't hurt size.
+  Also add several missing cases in tree-ssa-sccvn.c.
+  Owner: carrot
+  Status: Backported from upstream changes 145172, 145189 and 153491.
+
+gcc/fold-const.c
+gcc/Makefile.in
+  Fix 2045297
+  Owner: davidxl
+  Status: to be submitted
+
+gcc/c.opt
+gcc/c-typeck.c
+gcc/cp/typeck.c
+gcc/testsuite/g++.dg/warn/Wicf.C
+  Add -Wicf flag to warn when pointer comparisons are made. This could be
+  useful when linker ICF is used. This flag is not turned on with -Wall.
+  Owner: tmsriram
+  Status: local.
+
+gcc/target.h
+gcc/target-def.h
+gcc/targhooks.h
+gcc/targhooks.c
+gcc/doc/tm.texi
+gcc/config/arm/arm.c
+gcc/ifcvt.c
+gcc/recog.c
+gcc/sched-rgn.c
+gcc/final.c
+gcc/bb-reorder.c
+  Change the usage of macro HAVE_conditional_execution to new target hook
+  have_conditional_execution. And add an arm specific implementation of the
+  hook. This can enable more if conversion optimization opportunities.
+  Owner: carrot
+  Status: Backported from upstream change 153584.
+
+gcc/basic-block.h
+gcc/cfghooks.c
+gcc/cfglayout.c
+gcc/final.c
+gcc/gimple-pretty-print.c
+gcc/print-rtl.c
+gcc/rtl.h
+gcc/tree-cfg.c
+gcc/tree-pretty-print.c
+gcc/tree.c
+gcc/tree.h
+  Change discriminator tracking from per-basic-block to per-instruction.
+  Owner: ccoutant
+  Status: To be submitted upstream.
+
+gcc/config/arm/arm.md
+gcc/testsuite/gcc.target/arm/pr40835.c
+  Add peephole2 patterns to remove compare after move instructions.
+  Owner: carrot
+  Status: Backported from upstream change 153895.
+
+gcc/testsuite/gcc.target/arm/pr40835.c
+  Restrict the test for thumb1 target to avoid spurious fails when testing
+  thumb2 target.
+  Owner: carrot
+  Status: Backported from upstream change 154644.
+
+gcc/tree-ssa-pre.c
+  Fix 2222512
+  Owner: davidxl
+  Status: to be submitted 
+
+gcc/cp/optimize.c
+  Rewrites the body of deleting destructor by calling complete destructor
+  and delete function.
+  Owner: carrot
+  Status: This is upstream (4.5) mainline change 151673.
+
+gcc/common.opt
+gcc/doc/invoke.texi
+gcc/flags.h
+gcc/opts.c
+gcc/toplev.c
+gcc/tree-sample-profile.c
+  Add two different heuristics to convert instruction profiles to
+  block profiles.
+  Owner: nvachhar
+  Status: Not yet upstream
+
+gcc/Makefile.in
+gcc/testsuite/g++.dg/uninit-pred-1_a.C
+gcc/testsuite/g++.dg/uninit-pred-1_b.C
+gcc/testsuite/g++.dg/uninit-pred-2_a.C
+gcc/testsuite/g++.dg/uninit-pred-2_b.C
+gcc/testsuite/g++.dg/uninit-pred-loop-1_a.cc
+gcc/testsuite/g++.dg/uninit-pred-loop-1_b.cc
+gcc/testsuite/g++.dg/uninit-pred-loop-1_c.cc
+gcc/testsuite/g++.dg/uninit-pred-loop_1.cc
+gcc/testsuite/gcc.dg/uninit-11.c
+gcc/testsuite/gcc.dg/uninit-5.c
+gcc/testsuite/gcc.dg/uninit-pred-2_a.c
+gcc/testsuite/gcc.dg/uninit-pred-2_b.c
+gcc/testsuite/gcc.dg/uninit-pred-2_c.c
+gcc/testsuite/gcc.dg/uninit-pred-3_a.c
+gcc/testsuite/gcc.dg/uninit-pred-3_b.c
+gcc/testsuite/gcc.dg/uninit-pred-3_c.c
+gcc/testsuite/gcc.dg/uninit-pred-3_d.c
+gcc/testsuite/gcc.dg/uninit-pred-3_e.c
+gcc/testsuite/gcc.dg/uninit-pred-4_a.c
+gcc/testsuite/gcc.dg/uninit-pred-4_b.c
+gcc/testsuite/gcc.dg/uninit-pred-5_a.c
+gcc/testsuite/gcc.dg/uninit-pred-5_b.c
+gcc/testsuite/gcc.dg/uninit-pred-6_a.c
+gcc/testsuite/gcc.dg/uninit-pred-6_b.c
+gcc/testsuite/gcc.dg/uninit-pred-6_c.c
+gcc/testsuite/gcc.dg/uninit-pred-6_d.c
+gcc/testsuite/gcc.dg/uninit-pred-6_e.c
+gcc/testsuite/gcc.dg/uninit-pred-7_a.c
+gcc/testsuite/gcc.dg/uninit-pred-7_b.c
+gcc/testsuite/gcc.dg/uninit-pred-7_c.c
+gcc/testsuite/gcc.dg/uninit-pred-8_a.c
+gcc/testsuite/gcc.dg/uninit-pred-8_b.c
+gcc/testsuite/gcc.dg/uninit-pred-8_c.c
+gcc/testsuite/gcc.dg/uninit-pred-9_a.c
+gcc/testsuite/gcc.dg/uninit-pred-9_b.c
+gcc/tree-flow.h
+gcc/tree-ssa-uninit.c
+gcc/tree-ssa.c
+  Fix 1348501 False uninitialized warning
+  Owner: davidxl
+  Status: not in upstream
+
+gcc/config/arm/arm.c
+  Add a new function thumb1_size_rtx_costs to model the code size for
+  thumb1 instructions.
+  Owner: carrot
+  Status: Will be submitted to upstream after
+  http://gcc.gnu.org/bugzilla/show_bug.cgi?id=42258 has been fixed.
+
+gcc/common.opt
+gcc/doc/invoke.texi
+gcc/coverage.c
+gcc/value-prof.c
+  Fix 2337841
+  Suppress vervose messages from LIPO build
+  Owner: davidxl
+  Status: not submitted
+
+gcc/dwarf2out.c
+  Backport fix for corrupted rangelist (b/2304062).
+  http://gcc.gnu.org/ml/gcc-patches/2009-12/msg00994.html
+  http://gcc.gnu.org/ml/gcc-patches/2009-12/msg01055.html
+  Owner: ccoutant
+  Status: Backported from upstream r155402 and r155429
+
+gcc/tree-threadsafe-analyze.c
+gcc/testsuite/g++.dg/thread-ann/thread_annot_common.h
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-43.C
+gcc/testsuite/g++.dg/thread-ann/thread_annot_lock-44.C
+  Add support for releasable scoped lock (e.g. ReleasableMutexLock or
+  std::unique_lock). Also fix an issue when populating the intial lock sets.
+  We need to canonicalize the locks before adding them to the set.
+  Owner: lcwu
+  Status: not yet upstream
+
+gcc/tree-sample-profile.c
+gcc/tree-sample-profile.h
+  Store file name per sample, not per function.  This allows samples
+  to be attributed to .h files properly (i.e., from macro
+  expansion).
+  Owner: nvachhar
+  Status: Not yet upstream
+
+gcc/tree-sample-profile.c
+  Remove newlines from the end of inform calls.
+  Owner: nvachhar
+  Status: Not yet upstream
+
+gcc/tree-sample-profile.c
+  Use dump_base_name as the base file name for edge profile dumps.
+  Owner: nvachhar
+  Status: Not yet upstream
+
+gcc/mcf.c
+gcc/tree-sample-profile.c
+gcc/params.def
+gcc/doc/invoke.texi
+  Make the number of iterations used to cancel cycles in MCF a
+  parameter.  Print out a message when cycle cancellation exits early
+  due to this limit.  Also add an assert to avoid any memory buffer
+  overruns.
+  Owner: nvachhar
+  Status: Not yet upstream
+
+gcc/tree-flow-inline.h
+  Backport upstream r146299 which fixes an inverted condition in get_lineno.
+  Owner: nvachhar
+  Status: Backported from upstream r146299
+
+gcc/ifcvt.c
+  Use the locus information from the if-statment (rather than the then
+  path) for all the instructions after if conversion.
+  Owner: nvachhar
+  Status: Not yet upstream
+
+gcc/tree-sample-profile.c
+gcc/tree-sample-profile.h
+gcc/params.def
+gcc/doc/invoke.texi
+  Add support for using discriminator information when doing SampleFDO
+  attribution.
+  Owner: nvachhar
+  Status: Not yet upstream
+
+gcc/gimple-low.c
+gcc/testsuite/g++.dg/warn/Wuninitialized-5.C
+gcc/testsuite/g++.dg/warn/pragma-system_header3.h
+gcc/testsuite/g++.dg/warn/unit-1.C
+gcc/testsuite/gcc.dg/pr39666-2.c
+gcc/testsuite/gcc.dg/uninit-I.c
+gcc/testsuite/gcc.dg/uninit-pr19430.c
+gcc/testsuite/gcc.dg/uninit-pr20644.c
+gcc/testsuite/gfortran.dg/pr25923.f90
+gcc/testsuite/gfortran.dg/pr39666-2.f90
+  Make merged return statements use the last line of the function as
+  their line number.  Update the test suite accordingly.
+  Owner: nvachhar
+  Status: Not yet upstream
+
+gcc/testsuite/gfortran.dg/pr25923.f90
+  Update this test to expect a warning on different lines depending on
+  whether it is compiled -m32/-m64.
+  Owner: nvachhar
+  Status: Not yet upstream
+
+gcc/mcf.c
+  Use minimum cost circulation instead of minimum cost flow to ensure
+  that function entry and exit weights can be adjusted.
+  Owner: nvachhar
+  Status: Not yet upstream
+
+gcc/Makefile.in
+gcc/cgraph.h
+gcc/common.opt
+gcc/cp/error.c
+gcc/ipa-inline.c
+gcc/opts.c
+  Add -finline-plan-<pass>=<file> option which reads a list of edges to inline
+  from a file.
+  Owner: meheff
+  Status: Not yet upstream
+
+gcc/tree-sample-profile.c
+  Use sample profile data to compute initial counts and probabilities
+  for edges rather than relying on static estimates.
+  Owner: nvachhar
+  Status: Not yet upstream
+
+gcc/coverage.c
+gcc/opts.c
+gcc/opts.h
+  Ensure FDO and Sample FDO parameters are set consistently.
+  Owner: nvachhar
+  Status: Not yet upstream
+
+gcc/basic-block.h
+gcc/mcf.c
+gcc/tree-sample-profile.c
+gcc/params.def
+gcc/doc/invoke.texi
+  Use heuristics to determine the confidence in the sample profile for
+  a basic block.  Use the confidence to adjust edge costs when doing
+  MCF.
+  Owner: nvachhar
+  Status: Not yet upstream
+
+gcc/config/arm/arm.md
+gcc/testsuite/gcc.target/arm/pr40670.c
+  Backport upstream patch 155427. Pass floating point constant moves to
+  integer registers as mov immediates for thumb1.
+  Owner: carrot
+  Status: backport from upstream
+
+gcc/combine.c
+gcc/testsuite/gcc.c-torture/execute/pr42691.c
+  Backport upstream patch in revision 155948. Fix a bug (pr42691) where the
+  outdated i3notes is not removed after combine i3 "set subreg reg" with
+  i2 "set reg const".
+  Owner: jingyu
+  Status: backport from upstream r155948.

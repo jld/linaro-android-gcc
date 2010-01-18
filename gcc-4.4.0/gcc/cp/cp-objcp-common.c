@@ -623,13 +623,13 @@ cp_save_built_in_decl_post_parsing (void)
                            saved_builtins, i, bi); ++i)
     {
       if (!TREE_STATIC (bi->decl) || DECL_ARTIFICIAL (bi->decl))
-        continue;
+      	continue;
       /* Remember the defining module.  */
       cgraph_link_node (cgraph_node (bi->decl));
       if (!bi->decl_fini_copy)
         bi->decl_fini_copy = lipo_save_decl (bi->decl);
       else
-        gcc_assert (TREE_STATIC (bi->decl_fini_copy));
+	gcc_assert (TREE_STATIC (bi->decl_fini_copy));
     }
 }
 

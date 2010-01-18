@@ -5833,7 +5833,7 @@
 (define_split
   [(set (match_operand:SF 0 "arm_general_register_operand" "")
 	(match_operand:SF 1 "immediate_operand" ""))]
-  "TARGET_32BIT
+  "TARGET_EITHER
    && reload_completed
    && GET_CODE (operands[1]) == CONST_DOUBLE"
   [(set (match_dup 2) (match_dup 3))]
@@ -6485,6 +6485,7 @@
 		(const_int 6)
 		(const_int 8))))]
 )
+
 (define_insn "*movsi_cbranchsi4"
   [(set (pc)
 	(if_then_else
@@ -6546,6 +6547,45 @@
 		(le (minus (match_dup 2) (pc)) (const_int 2048)))
 	   (const_int 8)
 	   (const_int 10)))))]
+)
+
+(define_peephole2
+  [(set (match_operand:SI 0 "low_register_operand" "")
+	(match_operand:SI 1 "low_register_operand" ""))
+   (set (pc)
+	(if_then_else (match_operator 2 "arm_comparison_operator"
+		       [(match_dup 1) (const_int 0)])
+		      (label_ref (match_operand 3 "" ""))
+		      (pc)))]
+  "TARGET_THUMB1"
+  [(parallel
+    [(set (pc)
+	(if_then_else (match_op_dup 2 [(match_dup 1) (const_int 0)])
+		      (label_ref (match_dup 3))
+		      (pc)))
+     (set (match_dup 0) (match_dup 1))])]
+  ""
+)
+
+;; Sigh!  This variant shouldn't be needed, but combine often fails to
+;; merge cases like this because the op1 is a hard register in
+;; CLASS_LIKELY_SPILLED_P.
+(define_peephole2
+  [(set (match_operand:SI 0 "low_register_operand" "")
+	(match_operand:SI 1 "low_register_operand" ""))
+   (set (pc)
+	(if_then_else (match_operator 2 "arm_comparison_operator"
+		       [(match_dup 0) (const_int 0)])
+		      (label_ref (match_operand 3 "" ""))
+		      (pc)))]
+  "TARGET_THUMB1"
+  [(parallel
+    [(set (pc)
+	(if_then_else (match_op_dup 2 [(match_dup 1) (const_int 0)])
+		      (label_ref (match_dup 3))
+		      (pc)))
+     (set (match_dup 0) (match_dup 1))])]
+  ""
 )
 
 (define_insn "*negated_cbranchsi4"

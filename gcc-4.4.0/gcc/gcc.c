@@ -2438,8 +2438,8 @@ clear_failure_queue (void)
   failure_delete_queue = 0;
 }
 
-/* Call CALLBACK for each path in PATHS, breaking out early if CALLBACK
-   returns non-NULL.
+/* Call CALLBACK for each path in PATHS that matches PRIORITY, breaking
+   out early if CALLBACK returns non-NULL.
    If DO_MULTI is true iterate over the paths twice, first with multilib
    suffix then without, otherwise iterate over the paths once without
    adding a multilib suffix.  When DO_MULTI is true, some attempt is made
@@ -2452,11 +2452,12 @@ clear_failure_queue (void)
    Returns the value returned by CALLBACK.  */
 
 static void *
-for_each_path (const struct path_prefix *paths,
-	       bool do_multi,
-	       size_t extra_space,
-	       void *(*callback) (char *, void *),
-	       void *callback_info)
+for_each_path_with_priority (const struct path_prefix *paths,
+	                     /* enum path_prefix_priority */ int priority,
+	                     bool do_multi,
+	                     size_t extra_space,
+	                     void *(*callback) (char *, void *),
+	                     void *callback_info)
 {
   struct prefix_list *pl;
   const char *multi_dir = NULL;
@@ -2506,6 +2507,9 @@ for_each_path (const struct path_prefix *paths,
 
       for (pl = paths->plist; pl != 0; pl = pl->next)
 	{
+	  if (pl->priority != priority)
+	    continue;
+
 	  len = strlen (pl->prefix);
 	  memcpy (path, pl->prefix, len);
 
@@ -2596,6 +2600,45 @@ for_each_path (const struct path_prefix *paths,
   if (ret != path)
     free (path);
   return ret;
+}
+
+/* Ranking of prefixes in the sort list. -B prefixes are put before
+   all others.  */
+
+enum path_prefix_priority
+{
+  PREFIX_PRIORITY_B_OPT,
+  PREFIX_PRIORITY_LAST
+};
+
+/* Call CALLBACK for each path in PATHS, breaking out early if CALLBACK
+   returns non-NULL.  This processes all paths of the lowest priority
+   first, then proceeds to paths of each highest priority in turn.
+   If DO_MULTI is true iterate over the paths twice, first with multilib
+   suffix then without, otherwise iterate over the paths once without
+   adding a multilib suffix.  When DO_MULTI is true, some attempt is made
+   to avoid visiting the same path twice, but we could do better.  For
+   instance, /usr/lib/../lib is considered different from /usr/lib.
+   At least EXTRA_SPACE chars past the end of the path passed to
+   CALLBACK are available for use by the callback.
+   CALLBACK_INFO allows extra parameters to be passed to CALLBACK.
+
+   Returns the value returned by CALLBACK.  */
+
+static void *
+for_each_path (const struct path_prefix *paths,
+	       bool do_multi,
+	       size_t extra_space,
+	       void *(*callback) (char *, void *),
+	       void *callback_info)
+{
+  void *result = for_each_path_with_priority (paths, PREFIX_PRIORITY_B_OPT,
+                                              do_multi, extra_space, callback,
+                                              callback_info);
+  if (result != NULL)
+    return result;
+  return for_each_path_with_priority (paths, PREFIX_PRIORITY_LAST, do_multi,
+                                      extra_space, callback, callback_info);
 }
 
 /* Callback for build_search_list.  Adds path to obstack being built.  */
@@ -2767,15 +2810,6 @@ find_a_file (const struct path_prefix *pprefix, const char *name, int mode,
 				file_at_path, &info);
 }
 
-/* Ranking of prefixes in the sort list. -B prefixes are put before
-   all others.  */
-
-enum path_prefix_priority
-{
-  PREFIX_PRIORITY_B_OPT,
-  PREFIX_PRIORITY_LAST
-};
-
 /* Add an entry for PREFIX in PLIST.  The PLIST is kept in ascending
    order according to PRIORITY.  Within each PRIORITY, new entries are
    appended.
@@ -2792,7 +2826,7 @@ enum path_prefix_priority
 
 static void
 add_prefix (struct path_prefix *pprefix, const char *prefix,
-	    const char *component, /* enum prefix_priority */ int priority,
+	    const char *component, /* enum path_prefix_priority */ int priority,
 	    int require_machine_suffix, int os_multilib)
 {
   struct prefix_list *pl, **prev;
@@ -2826,7 +2860,7 @@ add_prefix (struct path_prefix *pprefix, const char *prefix,
 static void
 add_sysrooted_prefix (struct path_prefix *pprefix, const char *prefix,
 		      const char *component,
-		      /* enum prefix_priority */ int priority,
+		      /* enum path_prefix_priority */ int priority,
 		      int require_machine_suffix, int os_multilib)
 {
   if (!IS_ABSOLUTE_PATH (prefix))

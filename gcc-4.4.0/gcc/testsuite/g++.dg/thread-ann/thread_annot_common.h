@@ -74,4 +74,11 @@ class SCOPED_LOCKABLE ReaderMutexLock {
   ~ReaderMutexLock() UNLOCK_FUNCTION();
 };
 
+class SCOPED_LOCKABLE ReleasableMutexLock {
+ public:
+  explicit ReleasableMutexLock(Mutex *mu) EXCLUSIVE_LOCK_FUNCTION(mu);
+  ~ReleasableMutexLock() UNLOCK_FUNCTION();
+  void Release() UNLOCK_FUNCTION();
+};
+
 #endif // THREAD_ANNOT_COMMON_H

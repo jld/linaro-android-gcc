@@ -1802,8 +1802,9 @@ get_initial_def_for_induction (gimple iv_phi)
   set_vinfo_for_stmt (new_stmt, new_stmt_vec_info (new_stmt, loop_vinfo));
 
   /* Set the arguments of the phi node:  */
-  add_phi_arg (induction_phi, vec_init, pe);
-  add_phi_arg (induction_phi, vec_def, loop_latch_edge (iv_loop));
+  add_phi_arg (induction_phi, vec_init, pe, UNKNOWN_LOCATION);
+  add_phi_arg (induction_phi, vec_def, loop_latch_edge (iv_loop),
+  	       UNKNOWN_LOCATION);
 
 
   /* In case that vectorization factor (VF) is bigger than the number
@@ -2428,12 +2429,13 @@ vect_create_epilog_for_reduction (tree vect_def, gimple stmt,
   for (j = 0; j < ncopies; j++)
     {
       /* 1.1 set the loop-entry arg of the reduction-phi:  */
-      add_phi_arg (phi, vec_initial_def, loop_preheader_edge (loop));
+      add_phi_arg (phi, vec_initial_def, loop_preheader_edge (loop),
+      		   UNKNOWN_LOCATION);
 
       /* 1.2 set the loop-latch arg for the reduction-phi:  */
       if (j > 0)
         def = vect_get_vec_def_for_stmt_copy (dt, def);
-      add_phi_arg (phi, def, loop_latch_edge (loop));
+      add_phi_arg (phi, def, loop_latch_edge (loop), UNKNOWN_LOCATION);
 
       if (vect_print_dump_info (REPORT_DETAILS))
 	{
@@ -5707,7 +5709,7 @@ vect_setup_realignment (gimple stmt, gimple_stmt_iterator *gsi,
   msq = make_ssa_name (vec_dest, NULL);
   phi_stmt = create_phi_node (msq, containing_loop->header);
   SSA_NAME_DEF_STMT (msq) = phi_stmt;
-  add_phi_arg (phi_stmt, msq_init, pe);
+  add_phi_arg (phi_stmt, msq_init, pe, UNKNOWN_LOCATION);
 
   return msq;
 }
@@ -6695,7 +6697,8 @@ vectorizable_load (gimple stmt, gimple_stmt_iterator *gsi, gimple *vec_stmt,
 		{
 		  gcc_assert (phi);
 		  if (i == vec_num - 1 && j == ncopies - 1)
-		    add_phi_arg (phi, lsq, loop_latch_edge (containing_loop));
+		    add_phi_arg (phi, lsq, loop_latch_edge (containing_loop),
+		    		 UNKNOWN_LOCATION);
 		  msq = lsq;
 		}
 	    }
@@ -8155,7 +8158,8 @@ vect_loop_versioning (loop_vec_info loop_vinfo)
       new_phi = create_phi_node (SSA_NAME_VAR (PHI_RESULT (orig_phi)),
 				  new_exit_bb);
       arg = PHI_ARG_DEF_FROM_EDGE (orig_phi, e);
-      add_phi_arg (new_phi, arg, new_exit_e);
+      add_phi_arg (new_phi, arg, new_exit_e,
+      		   gimple_phi_arg_location_from_edge (orig_phi, e));
       SET_PHI_ARG_DEF (orig_phi, e->dest_idx, PHI_RESULT (new_phi));
     } 
 

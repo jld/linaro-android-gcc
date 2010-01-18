@@ -253,7 +253,7 @@ Objective-C and Objective-C++ Dialects}.
 -Wparentheses  -Wpedantic-ms-format -Wno-pedantic-ms-format @gol
 -Wpointer-arith  -Wno-pointer-to-int-cast @gol
 -Wredundant-decls @gol
--Wreturn-type  -Wsequence-point  -Wshadow @gol
+-Wreturn-type  -Wripa-opt-mismatch  -Wsequence-point  -Wshadow @gol
 -Wsign-compare  -Wsign-conversion  -Wstack-protector @gol
 -Wstrict-aliasing -Wstrict-aliasing=n @gol
 -Wstrict-overflow -Wstrict-overflow=@var{n} @gol
@@ -303,12 +303,13 @@ Objective-C and Objective-C++ Dialects}.
 -fdump-tree-storeccp@r{[}-@var{n}@r{]} @gol
 -feliminate-dwarf2-dups -feliminate-unused-debug-types @gol
 -feliminate-unused-debug-symbols -femit-class-debug-always @gol
+-fenable-icf-debug @gol
 -fmem-report -fpre-ipa-mem-report -fpost-ipa-mem-report -fprofile-arcs @gol
 -frandom-seed=@var{string} -fsched-verbose=@var{n} @gol
 -fsel-sched-verbose -fsel-sched-dump-cfg -fsel-sched-pipelining-verbose @gol
 -ftest-coverage  -ftime-report -fvar-tracking @gol
 -g  -g@var{level}  -gcoff -gdwarf-2 @gol
--ggdb  -gstabs  -gstabs+  -gvms  -gxcoff  -gxcoff+ @gol
+-ggdb  -gmlt  -gstabs  -gstabs+  -gvms  -gxcoff  -gxcoff+ @gol
 -fno-merge-debug-strings -fno-dwarf2-cfi-asm @gol
 -fdebug-prefix-map=@var{old}=@var{new} @gol
 -femit-struct-debug-baseonly -femit-struct-debug-reduced @gol
@@ -329,7 +330,7 @@ Objective-C and Objective-C++ Dialects}.
 -fcheck-data-deps -fconserve-stack -fcprop-registers -fcrossjumping @gol
 -fcse-follow-jumps -fcse-skip-blocks -fcx-fortran-rules -fcx-limited-range @gol
 -fdata-sections -fdce -fdce @gol
--fdelayed-branch -fdelete-null-pointer-checks -fdse -fdse -fdyn-ipa @gol
+-fdelayed-branch -fdelete-null-pointer-checks -fdse -fdse @gol
 -fearly-inlining -fexpensive-optimizations -ffast-math @gol
 -ffinite-math-only -ffloat-store -fforward-propagate @gol
 -ffunction-sections -fgcse -fgcse-after-reload -fgcse-las -fgcse-lm @gol
@@ -357,7 +358,8 @@ Objective-C and Objective-C++ Dialects}.
 -freciprocal-math -fregmove -frename-registers -freorder-blocks @gol
 -freorder-blocks-and-partition -freorder-functions @gol
 -frerun-cse-after-loop -freschedule-modulo-scheduled-loops @gol
--frounding-math -fsched2-use-superblocks @gol
+-fripa -fripa-disallow-opt-mismatch -fripa-verbose -frounding-math @gol
+-fsample-profile -fsample-profile-aggregate-using -fsched2-use-superblocks @gol
 -fsched2-use-traces -fsched-spec-load -fsched-spec-load-dangerous @gol
 -fsched-stalled-insns-dep[=@var{n}] -fsched-stalled-insns[=@var{n}] @gol
 -fschedule-insns -fschedule-insns2 -fsection-anchors -fsee @gol
@@ -371,6 +373,7 @@ Objective-C and Objective-C++ Dialects}.
 -ftree-dominator-opts -ftree-dse -ftree-fre -ftree-loop-im @gol
 -ftree-loop-distribution @gol
 -ftree-loop-ivcanon -ftree-loop-linear -ftree-loop-optimize @gol
+-ftree-lr-shrinking @gol
 -ftree-parallelize-loops=@var{n} -ftree-pre -ftree-reassoc @gol
 -ftree-sink -ftree-sra -ftree-switch-conversion @gol
 -ftree-ter -ftree-vect-loop-version -ftree-vectorize -ftree-vrp @gol
@@ -2763,6 +2766,7 @@ Options} and @ref{Objective-C and Objective-C++ Dialect Options}.
 -Wpointer-sign  @gol
 -Wreorder   @gol
 -Wreturn-type  @gol
+-Wripa-opt-mismatch @gol
 -Wsequence-point  @gol
 -Wsign-compare @r{(only in C++)}  @gol
 -Wstrict-aliasing  @gol
@@ -3150,6 +3154,16 @@ expression in a function whose return-type is @code{void}.
 For C++, a function without return type always produces a diagnostic
 message, even when @option{-Wno-return-type} is specified.  The only
 exceptions are @samp{main} and functions defined in system headers.
+
+This warning is enabled by @option{-Wall}.
+
+@item -Wripa-opt-mismatch
+@opindex Wripa-opt-mismatch
+@opindex Wno-ripa-opt-mismatch
+When doing an FDO build with @option{-fprofile-use} and @option{-fripa},
+warn if importing an axuiliary module that was built with a different
+GCC command line during the profile-generate phase than the primary
+module.
 
 This warning is enabled by @option{-Wall}.
 
@@ -4352,6 +4366,11 @@ debug format is long obsolete, but the option cannot be changed now.
 Instead use an additional @option{-g@var{level}} option to change the
 debug level for DWARF2.
 
+@item -gmlt
+@opindex gmlt
+Produce a minimal line table, with level 1 debugging information plus
+information about inlined functions and line numbers.
+
 @item -feliminate-dwarf2-dups
 @opindex feliminate-dwarf2-dups
 Compress DWARF2 debugging information by eliminating duplicated
@@ -4429,6 +4448,11 @@ You may need to experiment to determine the best settings for your application.
 The default is @samp{-femit-struct-debug-detailed=all}.
 
 This option works only with DWARF 2.
+
+@item -fenable-icf-debug
+@opindex fenable-icf-debug
+Generate additional debug information to support identical code folding (ICF).
+This option only works with DWARF version 2 or higher.
 
 @item -fno-merge-debug-strings
 @opindex fmerge-debug-strings
@@ -6233,6 +6257,11 @@ effectiveness of code motion optimizations.  It also saves one jump.  This flag
 is enabled by default at @option{-O} and higher.  It is not enabled
 for @option{-Os}, since it usually increases code size.
 
+@item -ftree-lr-shrinking
+@opindex ftree-lr-shrinking
+Enable live range shrinking optimization on trees. This optimization is used
+to help reducing register pressure.
+
 @item -ftree-loop-optimize
 @opindex ftree-loop-optimize
 Perform loop optimizations on trees.  This flag is enabled by default
@@ -6807,14 +6836,38 @@ code.
 If @var{path} is specified, GCC will look at the @var{path} to find
 the profile feedback data files. See @option{-fprofile-dir}.
 
-@item -fdyn-ipa
-@opindex fdyn-ipa
+@item -fripa
+@opindex fripa
 Perform dynamic inter-procedural analysis. This is used in conjunction with
 the @option{-fprofile-generate} and @option{-fprofile-use} options.
 During the @option{-fprofile-generate} phase, this flag turns on some additional
 instrumentation code that enables dynamic call-graph analysis.
 During the @option{-fprofile-use} phase, this flag enables cross-module
 optimizations such as inlining.
+
+@item -fripa-disallow-opt-mismatch
+@opindex fripa-disallow-opt-mismatch
+Don't import an auxiliary module, if the GCC command line options used for this
+auxiliary module during the profile-generate stage were different from those used
+for the primary module. Note that any mismatches in warning-related options are
+ignored for this comparison.
+
+@item -fripa-verbose
+@opindex fripa-verbose
+Enable printing of verbose information about dynamic inter-procedural optimizations.
+This is used in conjunction with the @option{-fripa}.
+
+@item -fsample-profile
+@itemx -fsample-profile=@var{path}
+@opindex fsample-profile
+Enable profile feedback directed optimizations using profiles obtained
+via sampling, and optimizations generally profitable only with profile
+feedback available.
+
+@item -fsample-profile-aggregate-using=@var{method}
+@opindex fsample-profile-aggreagate-using
+Select the method for (average or maximum) for converting
+instruction-level profiles into basic block level profiles.
 @end table
 
 The following options control compiler behavior regarding floating
@@ -7862,6 +7915,30 @@ number of available registers, live range shrinking optimization is enabled.
 @item reg-pressure-min-tree
 The minimal size (number of leaves) of a tree to be reshaped in the Live
 Range Shrinking optimization. 
+
+@item min-mcf-cancel-iters
+The minimum number of iterations of negative cycle cancellation during
+MCF profile correction before early termination.  This parameter is
+only useful when using @option{-fprofile-correction}.
+
+@item samplefdo-mcf-high-confidence-cost-mult
+Multiply the cost used by MCF during profile correction by this factor
+for all input profile data that is determined to be high confidence.
+This parameter is only useful when using @option{-fsample-profile} and
+@option{-fprofile-correction}.
+
+@item samplefdo-use-discrim
+When attributing samples to the CFG, use discriminators to identify
+which CFG nodes correspond to which samples.  This parameter is only
+useful when using @option{-fsample-profile}.
+
+@item samplefdo-large-block-thresh
+Consider a basic block large if it has more than this many gimple
+statements in it.  If a block is large and has no profile samples
+attributed to it, it will be assigned a weight of 0 with high
+confidence.  This parameter is only useful when using
+@option{-fsample-profile}.
+
 
 @end table
 @end table

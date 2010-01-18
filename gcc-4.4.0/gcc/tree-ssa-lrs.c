@@ -4411,25 +4411,15 @@ check_down_motion_target_loc (gimple target, gimple me,
   return target;
 }
 
-/* The function checks to see if there are possible violations 
-   of anti-depedency (memory) with this move.  Returns true if 
-   there is none.  TARGET_LOC is the statement before/after which 
-   statement STMT_TO_MOVE is to be moved.  IS_AFTER is the flag.  If
-   it is true, the insertion point is after TARGET LOC, otherwise
-   it is before it.  */
+/* Return the bitvector of reaching VDEFS at the program point
+   before (when IS_AFTER is false) or after (when IS_AFTER is true)
+   the TARGET_LOC statement.  */
 
-static bool
-is_down_motion_legal (gimple target_loc, gimple stmt_to_move,
-                      bool is_after, lrs_region_p region)
+static sbitmap
+get_reaching_vdefs (gimple target_loc, bool is_after,
+                    lrs_region_p region)
 {
   sbitmap reaching_defs;
-  struct voptype_d *vuses;
-  int i, n;
-
-  gcc_assert (!gimple_vdef_ops (stmt_to_move));
-
-  if (!(vuses = gimple_vuse_ops (stmt_to_move)))
-    return true;
 
   if (!is_after)
     reaching_defs = get_stmt_rd_set (target_loc, region);
@@ -4450,6 +4440,67 @@ is_down_motion_legal (gimple target_loc, gimple stmt_to_move,
           reaching_defs = get_bb_rd_out_set (rid, region);
         }
     }
+  return reaching_defs;
+}
+
+/* Stack layout in cfgexpand.c performs stack reuse/overlay on
+   stack variables that do not conflict. However variable conflicit
+   computation is not based on variable life time overlap analsysis,
+   but on information of variable scopes -- a variable conflicts with
+   another variable in the same scope or a nested scope. Two variables
+   won't conflict if they are in different scopes not nested with each
+   other. The assumption is that no optimization will introduce life time
+   overlap for stack variables in different scopes.  Return true if
+   STMT_TO_MOVE reference a stack variable that may be a candidate for
+   stack reuse. */
+static bool
+reference_overlapable_stack_variable_p (gimple stmt_to_move)
+{
+  enum tree_code gc;
+  tree var;
+
+  gcc_assert (is_gimple_assign (stmt_to_move));
+  gc = gimple_assign_rhs_code (stmt_to_move);
+  /* We do not care about PARM_DECL as they are in the top level scope.
+     Should probably also filter out top level local VAR_DECLS.  */
+  if (gc != VAR_DECL)
+    return false;
+
+  var = gimple_assign_rhs1 (stmt_to_move);
+
+  if (TREE_STATIC (var) || DECL_EXTERNAL (var))
+    return false;
+
+  if (DECL_ARTIFICIAL (var))
+    return false;
+
+  return true;
+}
+
+/* The function checks to see if there are possible violations 
+   of anti-depedency (memory) with this move.  Returns true if 
+   there is none.  TARGET_LOC is the statement before/after which 
+   statement STMT_TO_MOVE is to be moved.  IS_AFTER is the flag.  If
+   it is true, the insertion point is after TARGET LOC, otherwise
+   it is before it.  */
+
+static bool
+is_down_motion_legal (gimple target_loc, gimple stmt_to_move,
+                      bool is_after, lrs_region_p region)
+{
+  sbitmap reaching_defs;
+  struct voptype_d *vuses;
+  int i, n;
+
+  gcc_assert (!gimple_vdef_ops (stmt_to_move));
+
+  if (!(vuses = gimple_vuse_ops (stmt_to_move)))
+    return true;
+
+  if (reference_overlapable_stack_variable_p (stmt_to_move))
+    return false;
+
+  reaching_defs = get_reaching_vdefs (target_loc, is_after, region);
 
   while (vuses)
     {
@@ -4589,6 +4640,7 @@ sink_multi_use_def (gimple_stmt_iterator gsi_cm_stmt,
   int j, k;
   bool insert_after = false;
   size_t target_order;
+  sbitmap reaching_defs;
 
   cm_stmt = gsi_stmt (gsi_cm_stmt);
   gsi_prev_stmt = gsi_cm_stmt;
@@ -4636,13 +4688,20 @@ sink_multi_use_def (gimple_stmt_iterator gsi_cm_stmt,
 
   gsi_target = gsi_for_stmt (latest);
   target_order = get_stmt_order (latest);
+  reaching_defs
+      = (region->stmt_rd_sets
+         ? get_reaching_vdefs (latest, insert_after, region)
+         : NULL);
   k = VEC_length (gimple, cm_stmt_lrs_tree->tree_nodes);
   for (j = 0; j < k; j++)
     {
       gimple_stmt_iterator gsi_cm;
       gimple inner_node
           = VEC_index (gimple, cm_stmt_lrs_tree->tree_nodes, j);
+      int stmt_id;
+
       gsi_cm = gsi_for_stmt (inner_node);
+      stmt_id = get_stmt_idx_in_region (inner_node);
       if (insert_after)
         {
           gsi_move_after (&gsi_cm, &gsi_target);
@@ -4651,6 +4710,8 @@ sink_multi_use_def (gimple_stmt_iterator gsi_cm_stmt,
       else
         gsi_move_before (&gsi_cm, &gsi_target);
       reset_stmt_order (inner_node, target_order);
+      if (reaching_defs)
+        sbitmap_copy (region->stmt_rd_sets[stmt_id], reaching_defs);
     }
 
   if (dump_file && (dump_flags & TDF_DETAILS))
@@ -4885,6 +4946,7 @@ schedule_lrs_tree (gimple root, basic_block sched_bb, lrs_region_p region)
       gimple_stmt_iterator target_gsi;
       gimple_stmt_iterator gsi;
       size_t target_order;
+      sbitmap reaching_vdefs;
 
       /* To reduce the max number of temp register required, it is
          better to schedule the subtree with larger temp registers first.  */
@@ -4898,17 +4960,27 @@ schedule_lrs_tree (gimple root, basic_block sched_bb, lrs_region_p region)
 
       target_gsi = gsi_for_stmt (root);
       target_order = get_stmt_order (root);
+      reaching_vdefs
+          = (region->stmt_rd_sets
+             ? get_reaching_vdefs (root, false, region)
+             : NULL);
       for (i = 0; i < nsub; i++)
         {
           lrs_tree_p sub_tree = subtrees[i];
           k = VEC_length (gimple, sub_tree->tree_nodes);
           for (j = 0; j < k; j++)
             {
+              int stmt_id;
               gimple inner_node = VEC_index (gimple, sub_tree->tree_nodes, j);
+
+              stmt_id = get_stmt_idx_in_region (inner_node);
+
               VEC_safe_push (gimple, heap, lrs_tree->tree_nodes, inner_node);
               gsi = gsi_for_stmt (inner_node);
               gsi_move_before (&gsi, &target_gsi);
               reset_stmt_order (inner_node, target_order);
+              if (reaching_vdefs)
+                sbitmap_copy (region->stmt_rd_sets[stmt_id], reaching_vdefs);
               if (dump_file && (dump_flags & TDF_DETAILS))
                 {
                   fprintf (dump_file, "MOVED DOWN\n");
@@ -5085,7 +5157,8 @@ execute_lrs (void)
 static bool
 gate_tree_ssa_lrs (void)
 {
-  return (PARAM_VALUE (PARAM_CONTROL_REG_PRESSURE) != 0);
+  return (flag_tree_lr_shrinking
+          && (PARAM_VALUE (PARAM_CONTROL_REG_PRESSURE) != 0));
 }
 
 /* Print function for lrs_tree.  DUMP_FILE is the FILE pointer,

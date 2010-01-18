@@ -10,5 +10,5 @@ double foo(double *a)
        return r;
 }
 
-/* { dg-final { scan-tree-dump-times "transformed loop" 1 "ltrans" { xfail *-*-* } } } */ 
+/* { dg-final { scan-tree-dump-times "transformed loop" 1 "ltrans"} } */ 
 /* { dg-final { cleanup-tree-dump "ltrans" } } */

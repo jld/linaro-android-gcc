@@ -17,5 +17,5 @@ int medium_loop_interchange(int A[100][200])
   return A[1][1];
 }
 
-/* { dg-final { scan-tree-dump-times "transformed loop" 1 "ltrans" { xfail *-*-* } } } */ 
+/* { dg-final { scan-tree-dump-times "transformed loop" 1 "ltrans"} } */ 
 /* { dg-final { cleanup-tree-dump "ltrans" } } */

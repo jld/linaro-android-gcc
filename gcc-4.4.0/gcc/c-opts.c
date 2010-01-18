@@ -340,6 +340,7 @@ c_common_handle_option (size_t scode, const char *arg, int value)
     case OPT_MD:
     case OPT_MMD:
       cpp_opts->deps.style = (code == OPT_MD ? DEPS_SYSTEM: DEPS_USER);
+      cpp_opts->deps.need_preprocessor_output = true;
       deps_file = arg;
       break;
 
@@ -384,6 +385,7 @@ c_common_handle_option (size_t scode, const char *arg, int value)
       warn_missing_braces = value;
       warn_parentheses = value;
       warn_return_type = value;
+      warn_ripa_opt_mismatch = value;
       warn_sequence_point = value;	/* Was C only.  */
       warn_switch = value;
       if (warn_strict_aliasing == -1)
@@ -1028,6 +1030,9 @@ c_common_post_options (const char **pfilename)
     flag_gnu89_inline = !flag_isoc99;
   else if (!flag_gnu89_inline && !flag_isoc99)
     error ("-fno-gnu89-inline is only supported in GNU99 or C99 mode");
+
+  if (flag_dyn_ipa && cpp_opts->preprocessed)
+    error ("-fpreprocessed/-save-temps are not supported with -fripa");
 
   /* Default to ObjC sjlj exception handling if NeXT runtime.  */
   if (flag_objc_sjlj_exceptions < 0)

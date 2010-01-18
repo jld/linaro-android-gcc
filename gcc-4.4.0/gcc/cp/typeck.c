@@ -3578,6 +3578,45 @@ cp_build_binary_op (location_t location,
 
     case EQ_EXPR:
     case NE_EXPR:
+      if (TYPE_PTRMEMFUNC_P (type0) && TYPE_PTRMEMFUNC_P (type1))
+        {
+	  tree pfn0, pfn1;
+	  pfn0 = pfn_from_ptrmemfunc (op0);
+	  pfn1 = pfn_from_ptrmemfunc (op1);
+	  if (TREE_CODE (pfn0) == ADDR_EXPR
+	      && TREE_CODE (TREE_OPERAND (pfn0, 0)) == FUNCTION_DECL)
+	      warning_at (location,
+			  OPT_Wicf,
+			  "Method pointer used in comparison : %qD",
+			  TREE_OPERAND (pfn0, 0));
+	  if (TREE_CODE (pfn1) == ADDR_EXPR
+	      && TREE_CODE (TREE_OPERAND (pfn1, 0)) == FUNCTION_DECL)
+	      warning_at (location,
+			  OPT_Wicf,
+			  "Method pointer used in comparison : %qD",
+			  TREE_OPERAND (pfn1, 0));
+	}
+      else if (code0 == POINTER_TYPE && code1 == POINTER_TYPE)
+	{
+	  tree tt0 = TREE_TYPE (type0);
+	  tree tt1 = TREE_TYPE (type1);
+	  /* FUNCTION_TYPE check is made here because this warning should not
+	   * be printed for METHOD_TYPE which is handled above. */		
+	  if (TREE_CODE (op0) == ADDR_EXPR
+	      && TREE_CODE (tt0) == FUNCTION_TYPE
+	      && TREE_CODE (TREE_OPERAND (op0, 0)) == FUNCTION_DECL)
+	      warning_at (location,
+			  OPT_Wicf,
+			  "Function pointer used in comparison : %qD",
+			  TREE_OPERAND (op0, 0));
+	  if (TREE_CODE (op1) == ADDR_EXPR
+	      && TREE_CODE (tt1) == FUNCTION_TYPE
+	      && TREE_CODE (TREE_OPERAND (op1, 0)) == FUNCTION_DECL)
+	      warning_at (location,
+			  OPT_Wicf,
+			  "Function pointer used in comparison : %qD",
+			  TREE_OPERAND (op1, 0));
+	}
       if ((complain & tf_warning)
 	  && (FLOAT_TYPE_P (type0) || FLOAT_TYPE_P (type1)))
 	warning (OPT_Wfloat_equal,

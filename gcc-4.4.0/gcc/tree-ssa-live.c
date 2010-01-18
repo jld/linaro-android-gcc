@@ -580,8 +580,9 @@ remove_unused_scope_block_p (tree scope)
    else if (!cfun->after_inlining && BLOCK_VARS (scope))
      unused = false;
    /* For terse debug info we can eliminate info on unused variables.  */
-   else if (debug_info_level == DINFO_LEVEL_NONE
-	    || debug_info_level == DINFO_LEVEL_TERSE)
+   else if (!generate_debug_line_table
+	    && (debug_info_level == DINFO_LEVEL_NONE
+		|| debug_info_level == DINFO_LEVEL_TERSE))
      ;
    else if (BLOCK_VARS (scope) || BLOCK_NUM_NONLOCALIZED_VARS (scope))
      unused = false;

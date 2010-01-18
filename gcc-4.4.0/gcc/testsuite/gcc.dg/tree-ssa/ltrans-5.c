@@ -13,5 +13,5 @@ int foo ()
   return A[10][10];
 }
 
-/* { dg-final { scan-tree-dump-times "transformed loop" 1 "ltrans" { xfail *-*-* } } } */ 
+/* { dg-final { scan-tree-dump-times "transformed loop" 1 "ltrans"} } */ 
 /* { dg-final { cleanup-tree-dump "ltrans" } } */

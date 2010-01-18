@@ -1532,8 +1532,8 @@ initialize_root_vars (struct loop *loop, chain_p chain, bitmap tmp_vars)
 
       phi = create_phi_node (var, loop->header);
       SSA_NAME_DEF_STMT (var) = phi;
-      add_phi_arg (phi, init, entry);
-      add_phi_arg (phi, next, latch);
+      add_phi_arg (phi, init, entry, UNKNOWN_LOCATION);
+      add_phi_arg (phi, next, latch, UNKNOWN_LOCATION);
     }
 }
 
@@ -1599,8 +1599,8 @@ initialize_root_vars_lm (struct loop *loop, dref root, bool written,
       next = VEC_index (tree, *vars, 1);
       phi = create_phi_node (var, loop->header);
       SSA_NAME_DEF_STMT (var) = phi;
-      add_phi_arg (phi, init, entry);
-      add_phi_arg (phi, next, latch);
+      add_phi_arg (phi, init, entry, UNKNOWN_LOCATION);
+      add_phi_arg (phi, next, latch, UNKNOWN_LOCATION);
     }
   else
     {

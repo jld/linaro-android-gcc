@@ -156,6 +156,10 @@ Wpadded
 Common Var(warn_padded) Warning
 Warn when padding is required to align structure members
 
+Wripa-opt-mismatch
+Common Var(warn_ripa_opt_mismatch) Warning
+Warn if primary and auxiliary modules have mismatched command line options
+
 Wshadow
 Common Var(warn_shadow) Warning
 Warn when one local variable shadows another
@@ -502,6 +506,14 @@ fripa
 Common Report Var(flag_dyn_ipa)
 Perform Dynamic Inter-Procedural Analysis.
 
+fripa-disallow-opt-mismatch
+Common Report Var(flag_ripa_disallow_opt_mismatch)
+Don't import an auxiliary module if the command line options mismatch with the primary module
+
+fripa-verbose
+Common Report Var(flag_ripa_verbose)
+Enable verbose informational messages for LIPO compilation
+
 fearly-inlining
 Common Report Var(flag_early_inlining) Init(1) Optimization
 Perform early inlining
@@ -521,6 +533,10 @@ Perform unused type elimination in debug info
 femit-class-debug-always
 Common Report Var(flag_emit_class_debug_always) Init(0)
 Do not suppress C++ class debug information.
+
+fenable-icf-debug
+Common Report Var(flag_enable_icf_debug)
+Generate debug information to support Identical Code Folding (ICF)
 
 fexceptions
 Common Report Var(flag_exceptions) Optimization
@@ -668,6 +684,10 @@ finline-limit=
 Common RejectNegative Joined UInteger
 -finline-limit=<number>	Limit the size of inlined functions to <number>
 
+finline-plan-
+Common Joined RejectNegative
+-finline-plan-<pass>=<file> Apply inlining decisions specified in <file> in inlining pass <pass>.
+
 finstrument-functions
 Common Report Var(flag_instrument_function_entry_exit)
 Instrument function entry and exit with profiling calls
@@ -796,6 +816,10 @@ Perform SMS based modulo scheduling before the first scheduling pass
 fmodulo-sched-allow-regmoves
 Common Report Var(flag_modulo_sched_allow_regmoves)
 Perform SMS based modulo scheduling with register moves allowed
+
+flimit-hot-components
+Common Report Var(flag_limit_hot_components) Optimization Init(0)
+Limit the size of hot components of the call graph to reduce I-cache pressure
 
 fmove-loop-invariants
 Common Report Var(flag_move_loop_invariants) Init(1) Optimization
@@ -1012,6 +1036,12 @@ fsample-profile=
 Common Joined RejectNegative
 Use sample profile information for branch probabilities. The sample
 file is specified in the argument.
+
+fsample-profile-aggregate-using=
+Common Joined RejectNegative
+-fsample-profile-aggregate-using=[avg|max] Use the maximum or average
+number of samples across all instructions in a basic block as the
+basic block weight
 
 fsched-interblock
 Common Report Var(flag_schedule_interblock) Init(1) Optimization
@@ -1264,6 +1294,11 @@ ftree-fre
 Common Report Var(flag_tree_fre) Optimization
 Enable Full Redundancy Elimination (FRE) on trees
 
+ftree-lr-shrinking
+Common Report Var(flag_tree_lr_shrinking) Optimization
+Enable Live Range Shrinking optimization
+
+
 ftree-loop-distribution
 Common Report Var(flag_tree_loop_distribution) Optimization
 Enable loop distribution on trees
@@ -1319,6 +1354,10 @@ Perform live range splitting during the SSA->normal pass
 ftree-vrp
 Common Report Var(flag_tree_vrp) Init(0) Optimization
 Perform Value Range Propagation on trees
+
+fstrict-enum-precision
+Common Report Var(flag_strict_enum_precision) Init(1) Optimization
+Perform transformations based on enum precision
 
 funit-at-a-time
 Common Report Var(flag_unit_at_a_time) Init(1) Optimization
@@ -1450,6 +1489,10 @@ Generate debug information in DWARF v4 format (experimental)
 ggdb
 Common JoinedOrMissing
 Generate debug information in default extended format
+
+gmlt
+Common RejectNegative
+Generate debug information at level 1 with minimal line table
 
 gstabs
 Common JoinedOrMissing Negative(gstabs+)

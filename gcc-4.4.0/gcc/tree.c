@@ -3559,6 +3559,13 @@ expanded_location
 expand_location (source_location loc)
 {
   expanded_location xloc;
+
+  /* If LOC describes a location with a discriminator, extract the
+     discriminator and map it to the real location.  */
+  if (min_discriminator_location != UNKNOWN_LOCATION
+      && loc >= min_discriminator_location)
+    loc = map_discriminator_location (loc);
+
   if (loc == 0)
     {
       xloc.file = NULL;

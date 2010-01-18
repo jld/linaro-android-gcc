@@ -144,6 +144,19 @@ DEFPARAM (PARAM_MIN_INLINE_RECURSIVE_PROBABILITY,
 	  "Inline recursively only when the probability of call being executed exceeds the parameter",
 	  10, 0, 0)
 
+/* Parameters controlling the growth of hot components of the call
+   graph.  The size of a hot component (in internal gcc instructions)
+   is the total of all instructions within hot basic blocks of the
+   call graph nodes in the hot components.  */
+DEFPARAM(PARAM_LARGE_HOT_COMPONENT_INSNS,
+	 "large-hot-component-insns",
+	 "The size in insns for a hot component to be considered large, and thus have limits on its growth",
+	 4000, 0, 0)
+DEFPARAM(PARAM_HOT_COMPONENT_GROWTH,
+	 "hot-component-growth",
+	 "The maximum growth (in percent) of a hot component",
+	 5, 0, 0)
+
 /* Limit the number of expansions created by the variable expansion
    optimization to avoid register pressure.  */
 DEFPARAM (PARAM_MAX_VARIABLE_EXPANSIONS,
@@ -905,6 +918,30 @@ DEFPARAM (PARAM_GCOV_DEBUG,
 	  "gcov-debug",
 	  "Looking for gcda file in current dir.",
 	  1, 0, 1)
+
+DEFPARAM (PARAM_MIN_MCF_CANCEL_ITERS,
+	  "min-mcf-cancel-iters",
+	  "the minimum number of iterations of negative cycle cancellation "
+	  "in MCF",
+	  10, 1, 0)
+
+DEFPARAM (PARAM_SAMPLEFDO_MCF_HIGH_CONFIDENCE_COST_MULT,
+          "samplefdo-mcf-high-confidence-cost-mult",
+          "multiply base cost used by mcf by this factor for high confidence "
+          "profiles",
+          1000, 1, 1000000)
+
+DEFPARAM (PARAM_SAMPLEFDO_USE_DISCRIMINATORS,
+          "samplefdo-use-discrim",
+          "use discriminators when doing profile annotation",
+          1, 0, 1)
+
+DEFPARAM (PARAM_SAMPLEFDO_LARGE_BLOCK_THRESH,
+          "samplefdo-large-block-thresh",
+          "Consider a basic block large if it has more than this many gimple "
+          "statements in it",
+          5, 0, 1000)
+	  
 
 /*
 Local variables:

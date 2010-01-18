@@ -133,9 +133,6 @@ static int last_linenum;
 /* Last discriminator written to assembly.  */
 static int last_discriminator;
 
-/* Discriminator of current block.  */
-static int discriminator;
-
 /* Highest line number in current block.  */
 static int high_block_linenum;
 
@@ -145,9 +142,10 @@ static int high_function_linenum;
 /* Filename of last NOTE.  */
 static const char *last_filename;
 
-/* Override filename and line number.  */
+/* Override filename, line number, and discriminator.  */
 static const char *override_filename;
 static int override_linenum;
+static int override_discriminator;
 
 /* Whether to force emission of a line note before the next insn.  */
 static bool force_source_line = false;
@@ -203,10 +201,8 @@ rtx final_sequence;
 static int dialect_number;
 #endif
 
-#ifdef HAVE_conditional_execution
 /* Nonnull if the insn currently being emitted was a COND_EXEC pattern.  */
 rtx current_insn_predicate;
-#endif
 
 #ifdef HAVE_ATTR_length
 static int asm_insn_count (rtx);
@@ -1439,10 +1435,10 @@ add_debug_prefix_map (const char *arg)
       return;
     }
   map = XNEW (debug_prefix_map);
-  map->old_prefix = ggc_alloc_string (arg, p - arg);
+  map->old_prefix = xstrndup (arg, p - arg);
   map->old_len = p - arg;
   p++;
-  map->new_prefix = ggc_strdup (p);
+  map->new_prefix = xstrdup (p);
   map->new_len = strlen (p);
   map->next = debug_prefix_maps;
   debug_prefix_maps = map;
@@ -1492,7 +1488,7 @@ final_start_function (rtx first ATTRIBUTE_UNUSED, FILE *file,
 
   last_filename = locator_file (prologue_locator);
   last_linenum = locator_line (prologue_locator);
-  last_discriminator = discriminator = 0;
+  last_discriminator = 0;
 
   high_block_linenum = high_function_linenum = last_linenum;
 
@@ -1537,7 +1533,8 @@ final_start_function (rtx first ATTRIBUTE_UNUSED, FILE *file,
   {
       /* Issue a warning */
       warning (OPT_Wframe_larger_than_,
-               "the frame size of %wd bytes is larger than %wd bytes",
+               "the frame size of %wd bytes is larger than %wd bytes; "
+               "see http://go/big_stack_frame",
                get_frame_size (), frame_larger_than_size);
   }
 
@@ -1849,8 +1846,6 @@ final_scan_insn (rtx insn, FILE *file, int optimize ATTRIBUTE_UNUSED,
 	  else
 	    *seen |= SEEN_BB;
 
-          discriminator = NOTE_BASIC_BLOCK (insn)->discriminator;
-
 	  break;
 
 	case NOTE_INSN_EH_REGION_BEG:
@@ -1934,6 +1929,8 @@ final_scan_insn (rtx insn, FILE *file, int optimize ATTRIBUTE_UNUSED,
 		{
 		  override_filename = LOCATION_FILE (*locus_ptr);
 		  override_linenum = LOCATION_LINE (*locus_ptr);
+		  override_discriminator =
+		      get_discriminator_from_locus (*locus_ptr);
 		}
 	    }
 	  break;
@@ -1966,11 +1963,14 @@ final_scan_insn (rtx insn, FILE *file, int optimize ATTRIBUTE_UNUSED,
 		{
 		  override_filename = LOCATION_FILE (*locus_ptr);
 		  override_linenum = LOCATION_LINE (*locus_ptr);
+		  override_discriminator =
+		      get_discriminator_from_locus (*locus_ptr);
 		}
 	      else
 		{
 		  override_filename = NULL;
 		  override_linenum = 0;
+		  override_discriminator = 0;
 		}
 	    }
 	  break;
@@ -2088,10 +2088,9 @@ final_scan_insn (rtx insn, FILE *file, int optimize ATTRIBUTE_UNUSED,
 	const char *templ;
 	bool is_stmt;
 
-#ifdef HAVE_conditional_execution
 	/* Reset this early so it is correct for ASM statements.  */
 	current_insn_predicate = NULL_RTX;
-#endif
+
 	/* An INSN, JUMP_INSN or CALL_INSN.
 	   First check for special kinds that recog doesn't recognize.  */
 
@@ -2566,10 +2565,9 @@ final_scan_insn (rtx insn, FILE *file, int optimize ATTRIBUTE_UNUSED,
 	FINAL_PRESCAN_INSN (insn, recog_data.operand, recog_data.n_operands);
 #endif
 
-#ifdef HAVE_conditional_execution
-	if (GET_CODE (PATTERN (insn)) == COND_EXEC)
+        if (targetm.have_conditional_execution ()
+            && GET_CODE (PATTERN (insn)) == COND_EXEC)
 	  current_insn_predicate = COND_EXEC_TEST (PATTERN (insn));
-#endif
 
 #ifdef HAVE_cc0
 	cc_prev_status = cc_status;
@@ -2660,6 +2658,26 @@ final_scan_insn (rtx insn, FILE *file, int optimize ATTRIBUTE_UNUSED,
 	/* Output assembler code from the template.  */
 	output_asm_insn (templ, recog_data.operand);
 
+        /* Record point-of-call information for ICF debugging.  */
+	if (flag_enable_icf_debug && CALL_P (insn))
+	  {
+	    rtx x = call_from_call_insn (insn);
+	    x = XEXP (x, 0);
+	    if (x && MEM_P (x))
+	      {
+	        if (GET_CODE (XEXP (x, 0)) == SYMBOL_REF)
+	          {
+		    tree t;
+		    x = XEXP (x, 0);
+		    t = SYMBOL_REF_DECL (x);
+		    if (t)
+		      (*debug_hooks->direct_call) (t);
+	          }
+	        else
+	          (*debug_hooks->virtual_call) (INSN_UID (insn));
+	      }
+	  }
+
 	/* If necessary, report the effect that the instruction has on
 	   the unwind info.   We've already done this for delay slots
 	   and call instructions.  */
@@ -2687,16 +2705,19 @@ notice_source_line (rtx insn, bool *is_stmt)
 {
   const char *filename;
   int linenum;
+  int discriminator;
 
   if (override_filename)
     {
       filename = override_filename;
       linenum = override_linenum;
+      discriminator = override_discriminator;
     }
   else
     {
       filename = insn_file (insn);
       linenum = insn_line (insn);
+      discriminator = insn_discriminator (insn);
     }
 
   if (filename == NULL)
@@ -4386,4 +4407,3 @@ struct rtl_opt_pass pass_clean_state =
   0                                     /* todo_flags_finish */
  }
 };
-

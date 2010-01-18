@@ -320,6 +320,10 @@ rtx stack_limit_rtx;
    to optimize, debug_info_level and debug_hooks in process_options ().  */
 int flag_var_tracking = AUTODETECT_VALUE;
 
+/* Type of sample profile aggregation. */
+enum sp_aggregate_using_type flag_sample_profile_aggregate_using =
+  SAMPLE_PROFILE_AGGREGATE_USING_AVG;
+
 /* Type of stack check.  */
 enum stack_check_type flag_stack_check = NO_STACK_CHECK;
 
@@ -1519,7 +1523,7 @@ default_pch_valid_p (const void *data_p, size_t len)
 
 /* Default tree printer.   Handles declarations only.  */
 static bool
-default_tree_printer (pretty_printer * pp, text_info *text, const char *spec,
+default_tree_printer (pretty_printer *pp, text_info *text, const char *spec,
 		      int precision, bool wide, bool set_locus, bool hash)
 {
   tree t;
@@ -1530,6 +1534,15 @@ default_tree_printer (pretty_printer * pp, text_info *text, const char *spec,
 
   switch (*spec)
     {
+    case 'E':
+      t = va_arg (*text->args_ptr, tree);
+      if (TREE_CODE (t) == IDENTIFIER_NODE)
+	{
+	  pp_string (pp, IDENTIFIER_POINTER (t));
+	  return true;
+	}
+      break;
+
     case 'D':
       t = va_arg (*text->args_ptr, tree);
       if (DECL_DEBUG_EXPR_IS_FROM (t) && DECL_DEBUG_EXPR (t))

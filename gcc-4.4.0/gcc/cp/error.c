@@ -1090,6 +1090,7 @@ dump_function_decl (tree t, int flags)
   int show_return = flags & TFF_RETURN_TYPE || flags & TFF_DECL_SPECIFIERS;
   int do_outer_scope = ! (flags & TFF_UNQUALIFIED_NAME);
   tree exceptions;
+  tree orig_decl = t;
 
   flags &= ~TFF_UNQUALIFIED_NAME;
   if (TREE_CODE (t) == TEMPLATE_DECL)
@@ -1179,6 +1180,24 @@ dump_function_decl (tree t, int flags)
       pp_cxx_whitespace (cxx_pp);
       dump_template_bindings (template_parms, template_args);
       pp_cxx_right_bracket (cxx_pp);
+    }
+
+  /* Uniquely name the different types of constructors and
+     destructors.  The "complete" ctor/dtor type remains undecorated
+     as these are used in error messages.  Use the original decl,
+     ORIG_DECL, because T could have been set to the generalized
+     template decl above which drops the ctor/dtor type.  */
+  if (DECL_DESTRUCTOR_P (orig_decl))
+    {
+      if (DECL_DELETING_DESTRUCTOR_P (orig_decl))
+        pp_string (cxx_pp, " (deleting destructor)");
+      else if (DECL_BASE_DESTRUCTOR_P (orig_decl))
+        pp_string (cxx_pp, " (base destructor)");
+    }
+  else if (DECL_CONSTRUCTOR_P (orig_decl))
+    {
+      if (DECL_BASE_CONSTRUCTOR_P (orig_decl))
+        pp_string (cxx_pp, " (base constructor)");
     }
 }
 

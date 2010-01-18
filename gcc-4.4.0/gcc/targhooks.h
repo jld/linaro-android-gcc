@@ -104,3 +104,4 @@ extern bool default_hard_regno_scratch_ok (unsigned int);
 extern bool default_target_option_valid_attribute_p (tree, tree, tree, int);
 extern bool default_target_option_pragma_parse (tree, tree);
 extern bool default_target_option_can_inline_p (tree, tree);
+extern bool default_have_conditional_execution (void);

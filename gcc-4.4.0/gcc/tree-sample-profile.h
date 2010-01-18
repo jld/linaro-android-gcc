@@ -83,7 +83,6 @@ struct func_sample_hdr
   unsigned long long total_samples;
 
   /* Offset into string table.  */
-  unsigned long long filename_offset;
   unsigned long long func_name_index;
 
   /* Offset into profile section relative to fb_profile_offset.  */
@@ -110,7 +109,9 @@ struct func_sample_hdr
 
 struct fb_info_freq
 {
+  unsigned long long filename_offset;
   int line_num;
+  int discriminator;
   int num_instr;
   float freq;
 };
@@ -128,6 +129,7 @@ struct sample_freq_detail
   const char *filename;
   const char *func_name;
   int line_num;
+  int discriminator;
   int num_instr;
   float freq;
 };
@@ -137,6 +139,7 @@ struct sample_inline_freq
   bool is_first;
   int depth;
   int line_num;
+  int discriminator;
   expanded_location *inline_stack;
   const char *func_name;
   const char *filename;

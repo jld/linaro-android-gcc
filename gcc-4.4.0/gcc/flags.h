@@ -55,6 +55,10 @@ enum debug_info_level
 /* Specify how much debugging info to generate.  */
 extern enum debug_info_level debug_info_level;
 
+/* Whether to generate line number table.  Normally set at DINFO_LEVEL_NORMAL
+   or above; can also be set for DINFO_LEVEL_TERSE with -gmlt.  */
+extern bool generate_debug_line_table;
+
 /* A major contribution to object and executable size is debug
    information size.  A major contribution to debug information
    size is struct descriptions replicated in several object files.
@@ -281,6 +285,13 @@ extern int flag_var_tracking;
 /* True if flag_speculative_prefetching was set by user.  Used to suppress
    warning message in case flag was set by -fprofile-{generate,use}.  */
 extern bool flag_speculative_prefetching_set;
+
+enum sp_aggregate_using_type
+{
+  SAMPLE_PROFILE_AGGREGATE_USING_AVG,
+  SAMPLE_PROFILE_AGGREGATE_USING_MAX
+};
+extern enum sp_aggregate_using_type flag_sample_profile_aggregate_using;
 
 /* Type of stack check.  */
 enum stack_check_type

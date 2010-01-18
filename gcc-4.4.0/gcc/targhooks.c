@@ -765,4 +765,14 @@ default_target_option_can_inline_p (tree caller, tree callee)
   return ret;
 }
 
+bool
+default_have_conditional_execution (void)
+{
+#ifdef HAVE_conditional_execution
+  return HAVE_conditional_execution;
+#else
+  return false;
+#endif
+}
+
 #include "gt-targhooks.h"

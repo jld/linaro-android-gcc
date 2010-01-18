@@ -104,6 +104,14 @@ struct bb_threadsafe_info
   struct pointer_set_t *liveout_exclusive_locks;
   struct pointer_set_t *liveout_shared_locks;
 
+  /* Locks released by the Release routine of a scoped lock (e.g.
+     std::unique_lock::Release()). When a lock is released by such routines
+     on certain control-flow paths but not all, we consider it weakly
+     released and keep track of it in this set so that later when we encounter
+     the destructor of the scoped lock (which is also an UNLOCK function),
+     we will not emit a bogus warning.  */
+  struct pointer_set_t *weak_released_locks;
+
   /* Working live lock sets. These sets are used and updated during the
      analysis of statements.  */
   struct pointer_set_t *live_excl_locks;
@@ -1688,6 +1696,26 @@ handle_lock_primitive_attrs (gimple call, tree arg, tree base_obj,
                        live_excl_locks, live_shared_locks);
 }
 
+/* A helper function that removes the LOCKABLE from either LIVE_EXCL_LOCKS or
+   LIVE_SHARED_LOCKS, and returns the canonical form of LOCKABLE. If LOCKABLE
+   does not exist in either lock set, return NULL_TREE.  */
+
+static tree
+remove_lock_from_lockset (tree lockable, struct pointer_set_t *live_excl_locks,
+                          struct pointer_set_t *live_shared_locks)
+{
+  tree lock_contained;
+
+  if ((lock_contained = lock_set_contains(live_excl_locks, lockable, NULL_TREE,
+                                          false)) != NULL_TREE)
+    pointer_set_delete (live_excl_locks, lock_contained);
+  else if ((lock_contained = lock_set_contains(live_shared_locks, lockable,
+                                               NULL_TREE, false)) != NULL_TREE)
+    pointer_set_delete (live_shared_locks, lock_contained);
+
+  return lock_contained;
+}
+
 /* This function handles function calls that release locks (i.e. the
    functions annotated with the "unlock" attribute). Besides taking the
    lock out of the live lock set, it also checks whether the user code
@@ -1697,13 +1725,15 @@ handle_lock_primitive_attrs (gimple call, tree arg, tree base_obj,
 
 static void
 handle_unlock_primitive_attr (gimple call, tree arg, tree base_obj,
-                              struct pointer_set_t *live_excl_locks,
-                              struct pointer_set_t *live_shared_locks,
+                              struct bb_threadsafe_info *bbinfo,
                               const location_t *locus)
 {
+  struct pointer_set_t *live_excl_locks = bbinfo->live_excl_locks;
+  struct pointer_set_t *live_shared_locks = bbinfo->live_shared_locks;
   char lname[LOCK_NAME_LEN];
   tree lockable = NULL_TREE;
-  tree lock_contained;
+  tree lock_released;
+  bool is_weak_unlock = false;
 
   /* Check if the unlock attribute specifies a lock or the position of the
      primitive's argument corresponding to the lock.  */
@@ -1723,8 +1753,9 @@ handle_unlock_primitive_attr (gimple call, tree arg, tree base_obj,
     {
       gcc_assert (base_obj);
 
-      /* Check if the primitive is a destructor of a scoped_lock. If so,
-         get the lock to be released from scopedlock_to_lock_map.  */
+      /* Check if the primitive is an unlock routine (e.g. the destructor or
+         a release function) of a scoped_lock. If so, get the lock that is 
+         being released from scopedlock_to_lock_map.  */
       if (TREE_CODE (base_obj) == ADDR_EXPR)
         {
           tree scoped_lock = TREE_OPERAND (base_obj, 0);
@@ -1736,7 +1767,18 @@ handle_unlock_primitive_attr (gimple call, tree arg, tree base_obj,
               void **entry = pointer_map_contains (scopedlock_to_lock_map,
                                                    scoped_lock);
               if (entry)
-                lockable = (tree) *entry;
+                {
+                  tree fdecl = gimple_call_fndecl (call);
+                  gcc_assert (fdecl);
+                  lockable = (tree) *entry;
+                  /* Since this is a scoped lock, if the unlock routine is
+                     not the destructor, we assume it is a release function
+                     (e.g. std::unique_lock::release()). And therefore the
+                     lock is considered weakly released and should be added
+                     to the weak released lock set.  */
+                  if (!DECL_DESTRUCTOR_P (fdecl))
+                    is_weak_unlock = true;
+                }
             }
         }
       /* If the function is not a destructor of a scoped_lock, base_obj
@@ -1748,12 +1790,26 @@ handle_unlock_primitive_attr (gimple call, tree arg, tree base_obj,
 
   /* Remove the lock from the live lock set and, if it is not currently held,
      warn about the issue.  */
-  if ((lock_contained = lock_set_contains(live_excl_locks, lockable, NULL_TREE,
-                                          false)) != NULL_TREE)
-    pointer_set_delete(live_excl_locks, lock_contained);
-  else if ((lock_contained = lock_set_contains(live_shared_locks, lockable,
-                                               NULL_TREE, false)) != NULL_TREE)
-    pointer_set_delete(live_shared_locks, lock_contained);
+  if ((lock_released = remove_lock_from_lockset (lockable, live_excl_locks,
+                                                 live_shared_locks))
+      != NULL_TREE)
+    {
+      if (is_weak_unlock)
+        {
+          gcc_assert (bbinfo->weak_released_locks);
+          pointer_set_insert (bbinfo->weak_released_locks, lock_released);
+        }
+    }
+  else if (!is_weak_unlock
+           && ((lock_released =
+                lock_set_contains (bbinfo->weak_released_locks, lockable,
+                                   NULL_TREE, false)) != NULL_TREE))
+    {
+      /* If the unlock function is not a weak release and the lock is currently
+         in the weak release set, we need to remove it from the set as it is
+         no longer considered weakly released after this point.  */
+      pointer_set_delete (bbinfo->weak_released_locks, lock_released);
+    }
   else if (warn_thread_mismatched_lock_acq_rel)
     warning (OPT_Wthread_safety,
              G_("%HTry to unlock %s that was not acquired"),
@@ -1768,10 +1824,11 @@ handle_unlock_primitive_attr (gimple call, tree arg, tree base_obj,
 
 static void
 process_function_attrs (gimple call, tree fdecl,
-                        struct pointer_set_t *live_excl_locks,
-                        struct pointer_set_t *live_shared_locks,
+                        struct bb_threadsafe_info *current_bb_info,
                         const location_t *locus)
 {
+  struct pointer_set_t *live_excl_locks = current_bb_info->live_excl_locks;
+  struct pointer_set_t *live_shared_locks = current_bb_info->live_shared_locks;
   tree attr = NULL_TREE;
   char lname[LOCK_NAME_LEN];
   tree base_obj = NULL_TREE;
@@ -1899,16 +1956,14 @@ process_function_attrs (gimple call, tree fdecl,
                   continue;
                 }
               handle_unlock_primitive_attr (call, TREE_VALUE (arg), base_obj,
-                                            live_excl_locks, live_shared_locks,
-                                            locus);
+                                            current_bb_info, locus);
             }
         }
       else
         /* If the attribute does not have any argument, the lock to be
            released is the base obj (e.g. "mu" in mu->Unlock()).  */
         handle_unlock_primitive_attr (call, NULL_TREE, base_obj,
-                                      live_excl_locks, live_shared_locks,
-                                      locus);
+                                      current_bb_info, locus);
     }
 
   if (warn_thread_unguarded_func)
@@ -2235,8 +2290,7 @@ handle_call_gs (gimple call, struct bb_threadsafe_info *current_bb_info)
      Note that we want to process the arguments first so that the callee
      func decl attributes have no effects on the arguments.  */
   if (fdecl)
-    process_function_attrs (call, fdecl, current_bb_info->live_excl_locks,
-                            current_bb_info->live_shared_locks, &locus);
+    process_function_attrs (call, fdecl, current_bb_info, &locus);
 
   return;
 }
@@ -2615,6 +2669,10 @@ populate_lock_set_with_attr (struct pointer_set_t *lock_set, tree attr)
           lock = parm;
         }
 
+      /* Canonicalize the lock before we add it to the lock set.  */
+      if (!DECL_P (lock))
+        lock = get_canonical_expr (lock, NULL_TREE, false /* is_temp_expr */);
+
       /* Add the lock to the lock set.  */
       pointer_set_insert (lock_set, lock);
 
@@ -2933,6 +2991,9 @@ execute_threadsafe_analyze (void)
   threadsafe_info[ENTRY_BLOCK_PTR->index].liveout_shared_locks =
       live_shared_locks_at_entry;
 
+  threadsafe_info[ENTRY_BLOCK_PTR->index].weak_released_locks =
+      pointer_set_create ();
+
   /* Allocate the worklist of BBs for topological traversal, which is
      basically an array of pointers to basic blocks.  */
   worklist = XNEWVEC (basic_block, n_basic_blocks);
@@ -2981,6 +3042,8 @@ execute_threadsafe_analyze (void)
                   threadsafe_info[pred_bb->index].liveout_exclusive_locks);
               current_bb_info->live_shared_locks = pointer_set_copy (
                   threadsafe_info[pred_bb->index].liveout_shared_locks);
+              current_bb_info->weak_released_locks = pointer_set_copy (
+                  threadsafe_info[pred_bb->index].weak_released_locks);
               /* If the pred bb has a trylock call and its edge to the current
                  bb is the one for successful lock acquisition, add the
                  trylock live sets to the bb's live working sets.  */
@@ -3047,6 +3110,23 @@ execute_threadsafe_analyze (void)
               current_bb_info->live_shared_locks,
               pred_liveout_shared_locks,
               unreleased_locks);
+
+          /* Take the union of the weak released lock sets of the
+             predecessors.  */
+          pointer_set_union_inplace (
+              current_bb_info->weak_released_locks,
+              threadsafe_info[pred_bb->index].weak_released_locks);
+
+          /* If a lock is released by a Release function of a scoped lock on
+             some control-flow paths (but not all), the lock would still be
+             live on other paths, which is OK as the destructor of the scoped
+             lock will eventually release the lock. We don't want to emit
+             bogus warnings about the release inconsistency at the
+             control-flow join point. To avoid that, we simply add those
+             weakly-released locks in the REPORTED_UNRELEASED_LOCKS set.  */
+          pointer_set_union_inplace (
+              reported_unreleased_locks,
+              current_bb_info->weak_released_locks);
 
           /* Emit warnings for the locks that are not properly released.
              That is, the places they are released are not control
@@ -3124,6 +3204,8 @@ execute_threadsafe_analyze (void)
           pointer_set_destroy(threadsafe_info[i].liveout_exclusive_locks);
           pointer_set_destroy(threadsafe_info[i].liveout_shared_locks);
         }
+      if (threadsafe_info[i].weak_released_locks != NULL)
+        pointer_set_destroy (threadsafe_info[i].weak_released_locks);
       if (threadsafe_info[i].edge_exclusive_locks != NULL)
         pointer_set_destroy (threadsafe_info[i].edge_exclusive_locks);
       if (threadsafe_info[i].edge_shared_locks != NULL)

@@ -49,6 +49,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "timevar.h"
 #include "tree-pass.h"
 #include "toplev.h"
+#include "params.h"
 #include "gimple.h"
 #include "profile.h"
 #include "tree-sample-profile.h"
@@ -58,6 +59,8 @@ along with GCC; see the file COPYING3.  If not see
 #define FB_INLINE_MAX_STACK       200
 #define MAX_LINES_PER_BASIC_BLOCK 500
 #define MIN_SAMPLE_BB_COUNT       5
+
+#define DISCRIM(x) (PARAM_VALUE (PARAM_SAMPLEFDO_USE_DISCRIMINATORS) ? (x) : 0)
 
 /* File name of sample file.  */
 const char *sample_data_name = NULL;
@@ -113,7 +116,6 @@ print_hash_table_statistics (htab_t htab)
    ...
    **********************************************
    pw (percentage weight) is a metric for overlap measurement.  */
-
 static void
 dump_cfg_profile (const char *pname)
 {
@@ -127,7 +129,7 @@ dump_cfg_profile (const char *pname)
   prof_compare_file = fopen (pname, "a");
   if (!prof_compare_file)
     {
-      inform (0, "Cannot create output file %s to dump CFG profile.", pname);
+      inform (0, "Cannot create output file %s to dump CFG profile", pname);
       return;
     }
 
@@ -163,14 +165,17 @@ dump_cfg_profile (const char *pname)
 /* Functions used for hash table to store samples.
    key = string base_filename:line_num.  */
 
-/* Create a hash string with FILENAME and LINE_NUM.  */
+/* Create a hash string with FILENAME, LINE_NUM, DISCRIMINATOR, and
+   FUNCNAME.  */
 static hashval_t
-create_hash_string (const char *filename, int line_num, const char * funcname)
+create_hash_string (const char *filename, int line_num, int discriminator, 
+		    const char *funcname)
 {
   /* An arbitrary initial value borrowed from hashtab.c.  */
   hashval_t h = 0x9e3779b9;
   h = iterative_hash (filename, strlen (filename), h);
   h = iterative_hash (&line_num, sizeof (line_num), h);
+  h = iterative_hash (&discriminator, sizeof(discriminator), h);
   h = iterative_hash (funcname, strlen (funcname), h);
   return h;
 }
@@ -185,7 +190,8 @@ sp_info_hash (const void *fb_info)
 
   gcc_assert (sp->line_num > 0);
 
-  return create_hash_string (sp->filename, sp->line_num, sp->func_name);
+  return create_hash_string (sp->filename, sp->line_num, sp->discriminator, 
+			     sp->func_name);
 }
 
 
@@ -201,6 +207,7 @@ sp_info_eq (const void *p, const void *q)
       (const struct sample_freq_detail *) q;
 
   return (a->line_num == b->line_num)
+    && (a->discriminator == b->discriminator)
     && (!strcmp (a->filename, b->filename))
     && (!strcmp (a->func_name, b->func_name));
 }
@@ -226,6 +233,8 @@ sp_inline_info_hash (const void *inline_info)
     }
   h = iterative_hash (i_info->filename, strlen (i_info->filename), h);
   h = iterative_hash (&(i_info->line_num), sizeof (i_info->line_num), h);
+  h = iterative_hash (&(i_info->discriminator),
+		      sizeof (i_info->discriminator), h);
   h = iterative_hash (i_info->func_name, strlen (i_info->func_name), h);
 
   return h;
@@ -245,6 +254,9 @@ sp_inline_info_eq (const void *p, const void *q)
   int i = 0;
 
   if (a->line_num != b->line_num)
+    return 0;
+
+  if (a->discriminator != b->discriminator)
     return 0;
 
   /* Compare the inline stacks.  */
@@ -375,13 +387,14 @@ get_total_count (gimple stmt, const char *func_name)
         BLOCK_SOURCE_LOCATION (block) == last_loc)
       continue;
     last_loc = BLOCK_SOURCE_LOCATION (block);
+    gcc_assert (i < FB_INLINE_MAX_STACK);
     stack[i++] = expand_location (last_loc);
   }
 
   inline_loc.depth = i;
   inline_loc.inline_stack = stack;
   inline_loc.func_name = func_name;
-  inline_loc.filename = gimple_filename (stmt);
+  inline_loc.filename = "";
   inline_loc.line_num = 0;
 
   inline_htab_entry = (struct sample_inline_freq *)
@@ -491,8 +504,9 @@ read_inline_function (FILE *infile, struct profile *prog_unit,
       inline_sample_buf[num_lines].depth = inline_depth;
       inline_sample_buf[num_lines].inline_stack = stack_buf;
       inline_sample_buf[num_lines].filename = 
-          &(prog_unit->str_table[inline_func_hdr.filename_offset]);
+	  &(prog_unit->str_table[0]);
       inline_sample_buf[num_lines].line_num = 0;
+      inline_sample_buf[num_lines].discriminator = 0;
       inline_sample_buf[num_lines].freq = inline_func_hdr.total_samples;
       inline_sample_buf[num_lines].is_first = false;
 
@@ -500,7 +514,7 @@ read_inline_function (FILE *infile, struct profile *prog_unit,
       slot = (struct sample_inline_freq **)
           htab_find_slot (sp_inline_htab, &inline_sample_buf[num_lines], INSERT);
       if (*slot)
-        inform (0, "Duplicate entry of callstack\n");
+        inform (0, "Duplicate entry of callstack");
       else
         *slot = &inline_sample_buf[num_lines];
 
@@ -513,17 +527,19 @@ read_inline_function (FILE *infile, struct profile *prog_unit,
               return curr_num_samples;
             }
 
-          /* All the entries share the inline_stack. Mark the first entry to
-             track when to delete the inline_stack.  */
 	  inline_sample_buf[j].func_name =
               &(prog_unit->str_table[inline_func_hdr.func_name_index]);
           inline_sample_buf[j].depth = inline_depth;
           inline_sample_buf[j].inline_stack = stack_buf;
 	  inline_sample_buf[j].filename =
-              &(prog_unit->str_table[inline_func_hdr.filename_offset]);
+              &(prog_unit->str_table[sample.filename_offset]);
 	  inline_sample_buf[j].line_num = sample.line_num;
+	  inline_sample_buf[j].discriminator = DISCRIM (sample.discriminator);
 	  inline_sample_buf[j].freq = sample.freq;
           inline_sample_buf[j].num_instr = sample.num_instr;
+
+          /* All the entries share the inline_stack. Mark the first entry to
+             track when to delete the inline_stack.  */
           if (j == 0)
             inline_sample_buf[j].is_first = true;
           else
@@ -536,8 +552,21 @@ read_inline_function (FILE *infile, struct profile *prog_unit,
           slot = (struct sample_inline_freq **)
               htab_find_slot (sp_inline_htab, &inline_sample_buf[j], INSERT);
           if (*slot)
-              inform (0, "Duplicate entry: %s:%d\n",
-                      inline_sample_buf[j].filename, inline_sample_buf[j].line_num);
+            {
+	      if (PARAM_VALUE (PARAM_SAMPLEFDO_USE_DISCRIMINATORS))
+		{
+		  inform (0, "Duplicate entry: %s:%d",
+			  inline_sample_buf[j].filename, 
+			  inline_sample_buf[j].line_num);
+		}
+	      else
+		{
+		  /* When not using discriminators, merge multiple
+		     entries with different discriminator values */
+		  (*slot)->freq += inline_sample_buf[j].freq;
+		  (*slot)->num_instr += inline_sample_buf[j].num_instr;
+		}
+	    }
           else
             {
               *slot = &inline_sample_buf[j];
@@ -615,11 +644,12 @@ sp_reader (const char *in_filename, struct profile *prog_unit)
 	  if (fread (&sample, 1, sizeof (sample), in_file) != sizeof (sample))
 	    return 0;
 
-	  sample_buf[j].filename =
-              &(prog_unit->str_table[func_hdr.filename_offset]);
           sample_buf[j].func_name = 
               &(prog_unit->str_table[func_hdr.func_name_index]);
+	  sample_buf[j].filename =
+  	      &(prog_unit->str_table[sample.filename_offset]);
 	  sample_buf[j].line_num = sample.line_num;
+	  sample_buf[j].discriminator = DISCRIM (sample.discriminator);
 	  sample_buf[j].freq = sample.freq;
           sample_buf[j].num_instr = sample.num_instr;
 	  if (sample.freq > sp_max_count)
@@ -630,11 +660,21 @@ sp_reader (const char *in_filename, struct profile *prog_unit)
               htab_find_slot (sp_htab, &sample_buf[j], INSERT);
           if (*slot)
             {
-              char *func_name =
-                  &(prog_unit->str_table[func_hdr.func_name_index]);
-              inform (0, "Duplicate entry: %s:%d func_name:%s\n",
-                      sample_buf[j].filename,
-                      sample_buf[j].line_num, func_name);
+	      if (PARAM_VALUE (PARAM_SAMPLEFDO_USE_DISCRIMINATORS))
+		{
+		  char *func_name =
+		    &(prog_unit->str_table[func_hdr.func_name_index]);
+		  inform (0, "Duplicate entry: %s:%d func_name:%s",
+			  sample_buf[j].filename,
+			  sample_buf[j].line_num, func_name);
+		}
+	      else
+		{
+		  /* When not using discriminators, merge multiple
+		     entries with different discriminator values */
+		  (*slot)->freq += sample_buf[j].freq;
+		  (*slot)->num_instr += sample_buf[j].num_instr;
+		}
             }
           else
             {
@@ -651,6 +691,15 @@ sp_reader (const char *in_filename, struct profile *prog_unit)
   return num_samples;
 }
 
+static int
+get_discriminator (gimple stmt)
+{
+  location_t loc = gimple_location (stmt);
+  if (loc == -1)
+    return -1;
+  return get_discriminator_from_locus (loc);
+}
+
 /* Compute the BB execution count from the sample profile data.  */
 void
 sp_annotate_bb (basic_block bb)
@@ -660,7 +709,7 @@ sp_annotate_bb (basic_block bb)
   unsigned int num_ir = 0, num_instr_sampled = 0;
   gcov_type sum_ir_count = 0;
   gcov_type bb_max_count = 0;
-  int lineno;
+  int lineno, discriminator;
   expanded_location inline_stack[FB_INLINE_MAX_STACK];
   int inline_stack_depth;
   int num_lines = 0, num_inlines = 0;
@@ -675,6 +724,7 @@ sp_annotate_bb (basic_block bb)
       lineno = get_lineno (stmt);
       if (lineno == -1)
 	continue;
+      discriminator = DISCRIM (get_discriminator (stmt));
       num_ir++;
 
       inline_stack_depth = sp_get_inline_stack (stmt, inline_stack);
@@ -691,6 +741,7 @@ sp_annotate_bb (basic_block bb)
           inline_loc.func_name = current_function_assembler_name ();
           inline_loc.filename = gimple_filename (stmt);
           inline_loc.line_num = lineno;
+	  inline_loc.discriminator = discriminator;
 
           inline_htab_entry = (struct sample_inline_freq *)
               htab_find (sp_inline_htab, (void *) &inline_loc);
@@ -726,8 +777,10 @@ sp_annotate_bb (basic_block bb)
           ir_loc.filename = gimple_filename (stmt);
           ir_loc.func_name = current_function_assembler_name ();
           ir_loc.line_num = lineno;
+	  ir_loc.discriminator = discriminator;
 
-          hash_val = create_hash_string (ir_loc.filename, lineno, ir_loc.func_name);
+          hash_val = create_hash_string (ir_loc.filename, lineno, discriminator,
+					 ir_loc.func_name);
 
           htab_entry = (struct sample_freq_detail *)
           htab_find_with_hash (sp_htab, (void *) &ir_loc, hash_val);
@@ -757,9 +810,30 @@ sp_annotate_bb (basic_block bb)
     }
 
   if (num_instr_sampled > 0)
-    bb->count = sum_ir_count / num_instr_sampled;
+    {
+      if (flag_sample_profile_aggregate_using
+          == SAMPLE_PROFILE_AGGREGATE_USING_MAX)
+	bb->count = bb_max_count;
+      else if (flag_sample_profile_aggregate_using
+               == SAMPLE_PROFILE_AGGREGATE_USING_AVG)
+	bb->count = sum_ir_count / num_instr_sampled;
+      else
+	gcc_unreachable();
+      bb->confidence = NORMAL_CONFIDENCE;
+    }
+  else if (num_ir > PARAM_VALUE (PARAM_SAMPLEFDO_LARGE_BLOCK_THRESH))
+    {
+      /* If there are many statements in a BB, but no instructions
+	 were sampled, one can be confident in the sampled profile
+	 count. */
+      bb->count = 0;
+      bb->confidence = HIGH_CONFIDENCE;
+    }
   else
-    bb->count = 0;
+    {
+      bb->count = 0;
+      bb->confidence = LOW_CONFIDENCE;
+    }
 
   if (dump_file)
     {
@@ -774,39 +848,82 @@ sp_annotate_bb (basic_block bb)
 
 }
 
-/* Initialize basic block count (bb->count) with sample counts.  */
+/* Compute the line number of the last stmt in BB. */
+static int
+compute_bb_last_lineno (basic_block bb)
+{
+  int lineno = 0;
+  if (!gsi_end_p (gsi_last_bb (bb)))
+    lineno = get_lineno (gsi_stmt (gsi_last_bb (bb)));
+  return (lineno == -1) ? 0 : lineno;
+}
+
+/* Initialize edge counts and edge probabilities (e->count,
+   e->probability) with sample count data.  */
 static void
 sp_init_cfg (void)
 {
   basic_block bb;
   edge e;
   edge_iterator ei;
-  gcov_type smooth_bb_count;
 
-  FOR_BB_BETWEEN (bb, ENTRY_BLOCK_PTR->next_bb, EXIT_BLOCK_PTR, next_bb)
-    FOR_EACH_EDGE (e, ei, bb->succs)
-    e->count = e->src->count * e->probability / REG_BR_PROB_BASE;
 
-  FOR_BB_BETWEEN (bb, ENTRY_BLOCK_PTR->next_bb, EXIT_BLOCK_PTR, next_bb)
-  {
-    smooth_bb_count = 0;
-    FOR_EACH_EDGE (e, ei, bb->succs)
+  FOR_BB_BETWEEN (bb, ENTRY_BLOCK_PTR->next_bb, EXIT_BLOCK_PTR, next_bb) 
     {
-      e->count = e->src->count * e->probability / REG_BR_PROB_BASE;
-      smooth_bb_count += e->count;
+      gcov_type total_count = 0;
+      int num_edge = 0;
+      FOR_EACH_EDGE (e, ei, bb->succs)
+	{
+	  total_count += e->dest->count;
+	  num_edge++;
+	}
+      
+      if (total_count == 0)
+	{
+	  /* If none of the successor blocks have samples, divide
+	     the source block's weight evenly among the out
+	     edges. */
+	  
+	  FOR_EACH_EDGE (e, ei, bb->succs)
+	    {
+	      e->count = e->src->count / num_edge;
+	      e->probability = REG_BR_PROB_BASE / num_edge;
+	    }
+	}
+      else
+	{
+	  /* Compute edge probabilities using the source and dest
+	     basic block counts.  This computation is wrong for
+	     critical edges, but we rely on MCF to clean up these
+	     inaccuracies. */
+
+	  FOR_EACH_EDGE (e, ei, bb->succs)
+	    {
+	      e->count = e->src->count * e->dest->count / total_count;
+	      e->probability = REG_BR_PROB_BASE * e->dest->count / total_count;
+
+	      /* If the current and next basic block end with the same
+                 line number, adjust the profile estimates. */
+	      if (compute_bb_last_lineno (bb) ==
+		  compute_bb_last_lineno (e->dest)) 
+		{
+		  e->dest->count = e->count;
+		}
+	    }
+	}
     }
-    bb->count = smooth_bb_count;
-  }
 
   /* Initialize ENTRY and EXIT counts.  */
   FOR_EACH_EDGE (e, ei, ENTRY_BLOCK_PTR->succs)
-  {
-    e->count = e->dest->count;
-    ENTRY_BLOCK_PTR->count += e->dest->count;
-  }
-
+    {
+      e->count = e->dest->count;
+      ENTRY_BLOCK_PTR->count += e->dest->count;
+    }
+  
   FOR_EACH_EDGE (e, ei, EXIT_BLOCK_PTR->preds)
-    EXIT_BLOCK_PTR->count += e->count;
+    {
+      EXIT_BLOCK_PTR->count += e->count;
+    }
 }
 
 /* Adjust the BB and edge frequency.  */
@@ -928,7 +1045,7 @@ init_sample_profile (void)
       flag_sample_profile = 0;
     }
   else
-    inform (0, "There are %llu samples in file %s.\n", sp_num_samples,
+    inform (0, "There are %llu samples in file %s", sp_num_samples,
 	    sample_data_name);
 }
 
@@ -954,13 +1071,6 @@ end_sample_profile (void)
 static unsigned int
 execute_sample_profile (void)
 {
-  /* Check if it's the first pass of the sample profile, if it is, use static
-     profile to estimate edge probability first.  */
-  if (!(cgraph_state == CGRAPH_STATE_FINISHED || cfun->after_tree_profile)) {
-    /* Estimate edge probability. MUST BE HERE because counts of all BBs are 0.  */
-    tree_estimate_probability ();
-    profile_status = PROFILE_ABSENT;
-  }
   /* Annotate CFG with sample profile.  */
   sp_annotate_cfg ();
   cfun->after_tree_profile = 1;
@@ -998,10 +1108,23 @@ struct gimple_opt_pass pass_tree_sample_profile = {
 static unsigned int
 execute_profile_dump (void)
 {
+  char *dump_cfg_filename = NULL;
   if (flag_branch_probabilities)
-    dump_cfg_profile ("prof.compare.branch");	/* Dump edge profile.  */
+    {
+      /* Dump edge profile.  */
+      dump_cfg_filename = concat(dump_base_name, ".prof.compare.branch", NULL);
+    }
   else if (flag_sample_profile)
-    dump_cfg_profile ("prof.compare.sample");	/* Dump sample profile.  */
+    {
+      /* Dump sample profile.  */
+      dump_cfg_filename = concat(dump_base_name, ".prof.compare.sample", NULL);
+    }
+
+  if (dump_cfg_filename)
+    {
+      dump_cfg_profile (dump_cfg_filename);
+      free (dump_cfg_filename);
+    }
   return 0;
 }
 

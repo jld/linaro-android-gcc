@@ -155,10 +155,12 @@ lower_function_body (void)
       x = gimple_build_label (t.label);
       gsi_insert_after (&i, x, GSI_CONTINUE_LINKING);
 
-      /* Remove the line number from the representative return statement.
-	 It now fills in for many such returns.  Failure to remove this
-	 will result in incorrect results for coverage analysis.  */
-      gimple_set_location (t.stmt, UNKNOWN_LOCATION);
+      /* Replace the line number from the representative return
+	 statement with the line number of the end of the function.
+	 It now fills in for many such returns.  Failure to replace
+	 this will result in incorrect results for coverage
+	 analysis.  */
+      gimple_set_location (t.stmt, cfun->function_end_locus);
       gsi_insert_after (&i, t.stmt, GSI_CONTINUE_LINKING);
     }
 

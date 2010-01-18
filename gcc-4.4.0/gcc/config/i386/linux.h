@@ -110,8 +110,14 @@ along with GCC; see the file COPYING3.  If not see
   "%{v:-V} %{Qy:} %{!Qn:-Qy} %{n} %{T} %{Ym,*} %{Yd,*} %{Wa,*:%*} \
   %{!mno-sse2avx:%{mavx:-msse2avx}} %{msse2avx:%{!mavx:-msse2avx}}"
 
+/* These may be provided by config/linux-grtev1.h.  */
+#ifndef LINUX_GRTE_EXTRA_SPECS
+#define LINUX_GRTE_EXTRA_SPECS
+#endif
+
 #undef  SUBTARGET_EXTRA_SPECS
 #define SUBTARGET_EXTRA_SPECS \
+  LINUX_GRTE_EXTRA_SPECS \
   { "link_emulation", LINK_EMULATION },\
   { "dynamic_linker", LINUX_DYNAMIC_LINKER }
 

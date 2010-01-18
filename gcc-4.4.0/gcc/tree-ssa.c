@@ -53,7 +53,7 @@ static struct pointer_map_t *edge_var_maps;
 /* Add a mapping with PHI RESULT and PHI DEF associated with edge E.  */
 
 void
-redirect_edge_var_map_add (edge e, tree result, tree def)
+redirect_edge_var_map_add (edge e, tree result, tree def, source_location locus)
 {
   void **slot;
   edge_var_map_vector old_head, head;
@@ -71,6 +71,7 @@ redirect_edge_var_map_add (edge e, tree result, tree def)
     }
   new_node.def = def;
   new_node.result = result;
+  new_node.locus = locus;
 
   VEC_safe_push (edge_var_map, heap, head, &new_node);
   if (old_head != head)
@@ -193,14 +194,16 @@ ssa_redirect_edge (edge e, basic_block dest)
   for (gsi = gsi_start_phis (e->dest); !gsi_end_p (gsi); gsi_next (&gsi))
     {
       tree def;
+      source_location locus ;
 
       phi = gsi_stmt (gsi);
       def = gimple_phi_arg_def (phi, e->dest_idx);
+      locus = gimple_phi_arg_location (phi, e->dest_idx);
 
       if (def == NULL_TREE)
 	continue;
 
-      redirect_edge_var_map_add (e, gimple_phi_result (phi), def);
+      redirect_edge_var_map_add (e, gimple_phi_result (phi), def, locus);
     }
 
   e = redirect_edge_succ_nodup (e, dest);
@@ -233,7 +236,7 @@ flush_pending_stmts (edge e)
 
       phi = gsi_stmt (gsi);
       def = redirect_edge_var_map_def (vm);
-      add_phi_arg (phi, def, e);
+      add_phi_arg (phi, def, e, redirect_edge_var_map_location (vm));
     }
 
   redirect_edge_var_map_clear (e);
@@ -1400,25 +1403,6 @@ walk_use_def_chains (tree var, walk_use_def_chains_fn fn, void *data,
 }
 
 
-/* Return true if T, an SSA_NAME, has an undefined value.  */
-
-bool
-ssa_undefined_value_p (tree t)
-{
-  tree var = SSA_NAME_VAR (t);
-
-  /* Parameters get their initial value from the function entry.  */
-  if (TREE_CODE (var) == PARM_DECL)
-    return false;
-
-  /* Hard register variables get their initial value from the ether.  */
-  if (TREE_CODE (var) == VAR_DECL && DECL_HARD_REGISTER (var))
-    return false;
-
-  /* The value is undefined iff its definition statement is empty.  */
-  return gimple_nop_p (SSA_NAME_DEF_STMT (t));
-}
-
 /* Emit warnings for uninitialized variables.  This is done in two passes.
 
    The first pass notices real uses of SSA names with undefined values.
@@ -1437,7 +1421,7 @@ ssa_undefined_value_p (tree t)
 /* Emit a warning for T, an SSA_NAME, being uninitialized.  The exact
    warning text is in MSGID and LOCUS may contain a location or be null.  */
 
-static void
+void
 warn_uninit (tree t, const char *gmsgid, void *data)
 {
   tree var = SSA_NAME_VAR (t);
@@ -1563,28 +1547,7 @@ warn_uninitialized_var (tree *tp, int *walk_subtrees, void *data_)
   return NULL_TREE;
 }
 
-/* Look for inputs to PHI that are SSA_NAMEs that have empty definitions
-   and warn about them.  */
-
-static void
-warn_uninitialized_phi (gimple phi)
-{
-  size_t i, n = gimple_phi_num_args (phi);
-
-  /* Don't look at memory tags.  */
-  if (!is_gimple_reg (gimple_phi_result (phi)))
-    return;
-
-  for (i = 0; i < n; ++i)
-    {
-      tree op = gimple_phi_arg_def (phi, i);
-      if (TREE_CODE (op) == SSA_NAME)
-	warn_uninit (op, "%qD may be used uninitialized in this function",
-		     NULL);
-    }
-}
-
-static unsigned int
+unsigned int
 warn_uninitialized_vars (bool warn_possibly_uninitialized)
 {
   gimple_stmt_iterator gsi;
@@ -1593,7 +1556,6 @@ warn_uninitialized_vars (bool warn_possibly_uninitialized)
 
   data.warn_possibly_uninitialized = warn_possibly_uninitialized;
 
-  calculate_dominance_info (CDI_POST_DOMINATORS);
 
   FOR_EACH_BB (bb)
     {
@@ -1617,10 +1579,6 @@ warn_uninitialized_vars (bool warn_possibly_uninitialized)
 	}
     }
 
-  /* Post-dominator information can not be reliably updated. Free it
-     after the use.  */
-
-  free_dominance_info (CDI_POST_DOMINATORS);
   return 0;
 }
 
@@ -1633,25 +1591,14 @@ execute_early_warn_uninitialized (void)
      as possible, thus don't do it here.  However, without
      optimization we need to warn here about "may be uninitialized".
   */
+  calculate_dominance_info (CDI_POST_DOMINATORS);
+
   warn_uninitialized_vars (/*warn_possibly_uninitialized=*/!optimize);
-  return 0;
-}
 
-static unsigned int
-execute_late_warn_uninitialized (void)
-{
-  basic_block bb;
-  gimple_stmt_iterator gsi;
+  /* Post-dominator information can not be reliably updated. Free it
+     after the use.  */
 
-  /* Re-do the plain uninitialized variable check, as optimization may have
-     straightened control flow.  Do this first so that we don't accidentally
-     get a "may be" warning when we'd have seen an "is" warning later.  */
-  warn_uninitialized_vars (/*warn_possibly_uninitialized=*/1);
-
-  FOR_EACH_BB (bb)
-    for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-      warn_uninitialized_phi (gsi_stmt (gsi));
-
+  free_dominance_info (CDI_POST_DOMINATORS);
   return 0;
 }
 
@@ -1668,25 +1615,6 @@ struct gimple_opt_pass pass_early_warn_uninitialized =
   NULL,					/* name */
   gate_warn_uninitialized,		/* gate */
   execute_early_warn_uninitialized,	/* execute */
-  NULL,					/* sub */
-  NULL,					/* next */
-  0,					/* static_pass_number */
-  0,					/* tv_id */
-  PROP_ssa,				/* properties_required */
-  0,					/* properties_provided */
-  0,					/* properties_destroyed */
-  0,					/* todo_flags_start */
-  0                                     /* todo_flags_finish */
- }
-};
-
-struct gimple_opt_pass pass_late_warn_uninitialized =
-{
- {
-  GIMPLE_PASS,
-  NULL,					/* name */
-  gate_warn_uninitialized,		/* gate */
-  execute_late_warn_uninitialized,	/* execute */
   NULL,					/* sub */
   NULL,					/* next */
   0,					/* static_pass_number */
