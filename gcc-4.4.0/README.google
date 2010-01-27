@@ -2229,3 +2229,9 @@ gcc/testsuite/gcc.c-torture/execute/pr42691.c
   i2 "set reg const".
   Owner: jingyu
   Status: backport from upstream r155948.
+
+gcc/combine.c
+  Backport upstream patch r152443. Fix a bug in distribute_and_simplify_rtx
+  in which a floating point mode RTX is unsafely optimized.
+  Owner: dougkwan
+  Status: backport of upstream rev 152443.
