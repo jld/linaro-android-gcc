@@ -211,6 +211,9 @@ typedef struct reg_alloc
   struct reg_alloc *parent;
 } *reg_alloc_p;
 
+DEF_VEC_P(reg_alloc_p);
+DEF_VEC_ALLOC_P(reg_alloc_p, heap);
+
 /* This data structure is used to represent the code region
    that is selected for live range shrinking transformation. 
    In this implementation, only two types of regions are 
@@ -235,7 +238,7 @@ typedef struct lrs_region
   size_t bitvec_width;
   /* The size (in the number of gimple statements) of the largest
      bb in the region.  */
-  size_t max_bb_size;
+  unsigned max_bb_size;
 
   /* The mapping from bb address to region index.  */
   struct pointer_map_t *bb_to_idx_map;
@@ -302,11 +305,11 @@ typedef struct lrs_region
 
   /* The number of available registers for each register
      class.  */
-  size_t available_regs[lrc_num];
+  unsigned available_regs[lrc_num];
   /* Computed register pressure for this region.  */
-  size_t reg_pressure[lrc_num];
+  unsigned reg_pressure[lrc_num];
   /* Computed register pressure for each BB in the region.  */
-  size_t *bb_reg_pressures[lrc_num];
+  unsigned *bb_reg_pressures[lrc_num];
 
 } *lrs_region_p;
 
@@ -324,8 +327,9 @@ static VEC(tree, heap) **reg_allocs = NULL;
 static size_t num_reg_allocs = 0;
 /* The map from ssa names to the associated reg allocs.  */
 static struct pointer_map_t *tmp_reg_alloc_map = NULL;
+static VEC(reg_alloc_p, heap) *reg_alloc_vec = NULL;
 static alloc_pool tmp_reg_alloc_pool = NULL;
-static size_t reg_pressure_control_min_bb_size = 0;
+static unsigned reg_pressure_control_min_bb_size = 0;
 
 struct pending_negates
 {
@@ -729,9 +733,9 @@ form_region (basic_block bb)
       if (dump_file)
         fprintf (dump_file,
                  "region (Entry BB# %d) is skipped: "
-                 "region max bb size = %d, min_size = %d!\n,",
+                 "region max bb size = %u, min_size = %u!\n,",
                  region->entry->index, region->max_bb_size,
-                 (int)reg_pressure_control_min_bb_size);
+                 reg_pressure_control_min_bb_size);
       destroy_region (region);
       return NULL;
     }
@@ -998,6 +1002,7 @@ find_or_create_reg_alloc (tree nm)
   ra->parent = NULL;
   VEC_safe_push (tree, heap, ra->members, nm);
   *slot = ra;
+  VEC_safe_push (reg_alloc_p, heap, reg_alloc_vec, ra);
   return ra;
 }
 
@@ -1050,78 +1055,81 @@ compute_reg_allocs (basic_block bb)
     }
 }
 
-/* The function is used to move members (ssa names) of 
-   a reg_alloc node to the root node of the union. The 
-   member array of the transferred node is then destroyed.  */
+/* The function is used to move members (ssa names) of
+   a reg_alloc node to the root node of the union. The
+   member array of the transferred node is then destroyed.
+   Returns the number of reg_alloc roots.  */
 
-static bool
-finalize_ra_mem (const void *key ATTRIBUTE_UNUSED, void **value,
-                  void *data )
+static int
+finalize_ra_mem (void)
 {
   reg_alloc_p ra = 0;
-  reg_alloc_p real_ra = 0;
-  size_t i, n;
-  int *c;
+  size_t r, c = 0;
 
-  c = (int *) data;
-
-  gcc_assert (*value);
-  ra = (reg_alloc_p) *value;
-  if (!ra->members)
-    return true;
-
-  real_ra = get_reg_alloc_root (ra);
-  if (real_ra == ra)
+  for (r = 0;
+       VEC_iterate (reg_alloc_p, reg_alloc_vec, r, ra);
+       r++)
     {
-      (*c)++ ;
-      return true;
+      size_t i;
+      tree nm;
+      reg_alloc_p real_ra = 0;
+
+      real_ra = get_reg_alloc_root (ra);
+      if (real_ra == ra)
+        {
+          c++;
+          continue;
+        }
+
+      if (!ra->members)
+        continue;
+
+      for (i = 0;
+           VEC_iterate (tree, ra->members, i, nm);
+           i++)
+        VEC_safe_push (tree, heap, real_ra->members, nm);
+
+      VEC_free (tree, heap, ra->members);
+      ra->members = 0;
     }
 
-  n = VEC_length (tree, ra->members);
-
-  for (i = 0; i < n; i++)
-    VEC_safe_push (tree, heap, real_ra->members,
-                   VEC_index (tree, ra->members, i));
-
-  VEC_free (tree, heap, ra->members);
-  ra->members = 0;
-
-  return true;
+  return c;
 }
 
 /* The function maps ssa names to their associated reg_alloc number.  */
 
-static bool
-finalize_ra_map (const void *key ATTRIBUTE_UNUSED, void **value,
-                  void *data ATTRIBUTE_UNUSED)
+static void
+finalize_ra_map (void)
 {
   reg_alloc_p ra = 0;
-  reg_alloc_p real_ra = 0;
-  size_t i, n;
+  size_t r;
 
-  gcc_assert (*value);
-  ra = (reg_alloc_p) *value;
-
-  real_ra = get_reg_alloc_root (ra);
-
-  if (!real_ra->members)
-    return true;
-
-
-  n = VEC_length (tree, real_ra->members);
-
-  for (i = 0; i < n; i++)
+  for (r = 0;
+       VEC_iterate (reg_alloc_p, reg_alloc_vec, r, ra);
+       r++)
     {
-      void **slot = pointer_map_insert (reg_alloc_map, 
-                                        VEC_index (tree, real_ra->members, i));
-      *slot = (void *)(size_t) num_reg_allocs;
+      size_t i;
+      reg_alloc_p real_ra = 0;
+      tree nm;
+
+      real_ra = get_reg_alloc_root (ra);
+      if (ra != real_ra)
+        continue;
+
+      if (!real_ra->members)
+        continue;
+
+      for (i = 0;
+           VEC_iterate (tree, real_ra->members, i, nm);
+           i++)
+        {
+          void **slot = pointer_map_insert (reg_alloc_map, nm);
+          *slot = (void *)(size_t) num_reg_allocs;
+        }
+
+      reg_allocs[num_reg_allocs++] = real_ra->members;
+      real_ra->members = 0;
     }
-
-  reg_allocs[num_reg_allocs++] = real_ra->members;
-
-  real_ra->members = 0;
-
-  return true;
 }
 
 /* The function returns the reg_alloc number/id for ssa
@@ -1135,7 +1143,7 @@ get_reg_alloc_id (const tree nm)
   slot = pointer_map_contains (reg_alloc_map, nm);
   if (!slot)
     return -1;
-  return (int) *slot;
+  return (int) (long) *slot;
 }
 
 /* The function destroys the temporary reg_alloc map
@@ -1148,6 +1156,8 @@ destroy_tmp_reg_alloc_map (void)
   free_alloc_pool (tmp_reg_alloc_pool);
   tmp_reg_alloc_map = 0;
   tmp_reg_alloc_pool = 0;
+  VEC_free (reg_alloc_p, heap, reg_alloc_vec);
+  reg_alloc_vec = NULL;
 }
 
 /* The function converts the temporary reg_alloc map
@@ -1158,12 +1168,10 @@ static void
 finalize_reg_allocs (void)
 {
   int sz = 0;
-  pointer_map_traverse (tmp_reg_alloc_map,
-                        finalize_ra_mem, &sz);
+  sz = finalize_ra_mem ();
   reg_allocs = XNEWVEC (VEC(tree, heap)*, sz);
   num_reg_allocs = 0;
-  pointer_map_traverse (tmp_reg_alloc_map,
-                        finalize_ra_map, NULL);
+  finalize_ra_map ();
   destroy_tmp_reg_alloc_map ();
 }
 
@@ -1261,7 +1269,7 @@ set_use_ref_bit_pos (tree *use, int pos, lrs_region_p region)
   void **slot;
 
   slot = pointer_map_insert (region->bit_pos_map, use);
-  *slot = (void*) pos;
+  *slot = (void *)(long) pos;
 }
 
 /* The function returns the bit position for use ref USE in REGION.  */
@@ -1274,7 +1282,7 @@ get_use_ref_bit_pos (tree *use, lrs_region_p region)
   slot = pointer_map_contains (region->bit_pos_map, use);
   gcc_assert (slot);
 
-  return (int)*slot;
+  return (int)(long) *slot;
 }
 
 /* The function returns the live reference set at the program point 
@@ -1642,6 +1650,8 @@ get_vop_operands (lrs_stmt_p norm_stmt,
     }
 }
 
+static struct pointer_map_t *orig_nm_order = NULL;
+
 /* The comparison function used in quick sorting of SSA names. The
    names are sorted according to the register allocation ids, or if
    not mapped to registers, their ssa name versions.  */
@@ -1655,8 +1665,18 @@ refed_nm_cmp (const void *p1, const void *p2)
   ra1 = get_reg_alloc_id (*n1);
   ra2 = get_reg_alloc_id (*n2);
 
-  if (ra1 == -1 && ra2 == -1)
-    return SSA_NAME_VERSION (*n2) - SSA_NAME_VERSION (*n1);
+  if (ra1 == ra2)
+    {
+      void **slot;
+      int o1, o2;
+
+      slot = pointer_map_contains (orig_nm_order, *n1);
+      o1 = (int)(long) *slot;
+      slot = pointer_map_contains (orig_nm_order, *n2);
+      o2 = (int)(long) *slot;
+      gcc_assert (o2 != o1);
+      return o2 - o1;
+    }
 
   if (ra2 == -1)
     return 1;
@@ -1717,6 +1737,17 @@ prepare_bitmaps (lrs_region_p region)
   nr = VEC_length (tree, refed_names);
   region_live_out_nms = sbitmap_alloc (nr);
   sbitmap_zero (region_live_out_nms);
+
+  /* Now remember original name order.  */
+  orig_nm_order = pointer_map_create ();
+  for (i = 0; i < nr; i++)
+    {
+      void **slot;
+
+      slot = pointer_map_insert (orig_nm_order,
+                                 VEC_index (tree, refed_names, i));
+      *slot = (void *)(long)i;
+    }
 
   /* Sort the refed names.  */
   qsort (VEC_address (tree, refed_names), VEC_length (tree, refed_names),
@@ -1874,6 +1905,8 @@ prepare_bitmaps (lrs_region_p region)
   pointer_map_destroy (nm_to_use_ref_map);
   pointer_set_destroy (vvar_set);
   pointer_set_destroy (vvar_name_set);
+  pointer_map_destroy (orig_nm_order);
+  orig_nm_order = NULL;
 }
 
 /* From the solution set of the use ref data flow problem, this function
@@ -2001,11 +2034,11 @@ is_lr_live (tree lr, sbitmap bitvec, lrs_region_p region)
 
 static void
 get_num_live_lrs (sbitmap bitvec, lrs_region_p region,
-                  size_t *ngr, size_t *nfr)
+                  unsigned *ngr, unsigned *nfr)
 {
   int i, n;
-  int gr_pressure = 0;
-  int fr_pressure = 0;
+  unsigned gr_pressure = 0;
+  unsigned fr_pressure = 0;
 
   n = VEC_length (tree, region->refed_names);
 
@@ -2035,13 +2068,13 @@ compute_reg_pressure_bb (basic_block bb, int bb_ridx, lrs_region_p region)
 {
 
   gimple_stmt_iterator gsi;
-  size_t bb_gr_pressure = 0;
-  size_t bb_fr_pressure = 0;
+  unsigned bb_gr_pressure = 0;
+  unsigned bb_fr_pressure = 0;
 
   for (gsi = gsi_start_phis (bb); !gsi_end_p (gsi); gsi_next (&gsi))
     {
       int id;
-      size_t ngr, nfr;
+      unsigned ngr, nfr;
       gimple stmt = gsi_stmt (gsi);
 
       id = get_stmt_idx_in_region (stmt);
@@ -2056,7 +2089,7 @@ compute_reg_pressure_bb (basic_block bb, int bb_ridx, lrs_region_p region)
   for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
     {
       int id;
-      size_t ngr, nfr;
+      unsigned ngr, nfr;
       gimple stmt = gsi_stmt (gsi);
 
       id = get_stmt_idx_in_region (stmt);
@@ -2131,7 +2164,7 @@ compute_reg_pressure (lrs_region_p region)
             region->available_regs[i]++;
         }
       region->reg_pressure[i] = 0;
-      region->bb_reg_pressures[i] = XNEWVEC (size_t, region->num_bbs);
+      region->bb_reg_pressures[i] = XNEWVEC (unsigned, region->num_bbs);
     }
 
   for (i = 0; i < region->num_bbs; i++)
@@ -2250,7 +2283,7 @@ set_vnm_bit_pos (tree vnm, int pos, lrs_region_p region)
   void **slot;
 
   slot = pointer_map_insert (region->vname_bit_pos_map, vnm);
-  *slot = (void *) pos;
+  *slot = (void *)(long) pos;
 }
 
 /* The function returns the bit position of virtual name VNM.  */
@@ -2278,7 +2311,7 @@ set_vvar_bit_range (int first, int last,
 
   slot = pointer_map_insert (region->vvar_bit_range_map, vvar);
   range = (first << 16) + last;
-  *slot = (void *)range;
+  *slot = (void *)(long) range;
 }
 
 /* The function gets the bit position range for virtual variable
@@ -2986,6 +3019,9 @@ reassoc_tree_opnd_cmp (const void *p1, const void *p2)
 
   opnd1 = *(const tree *) p1;
   opnd2 = *(const tree *) p2;
+  if (opnd1 == opnd2)
+    return 0;
+
   tc1 = TREE_CODE (opnd1);
   tc2 = TREE_CODE (opnd2);
   if (tc1 != SSA_NAME && tc2 == SSA_NAME)
@@ -3003,6 +3039,18 @@ reassoc_tree_opnd_cmp (const void *p1, const void *p2)
       stmt2 = SSA_NAME_DEF_STMT (opnd2);
       bb1 = gimple_bb (stmt1);
       bb2 = gimple_bb (stmt2);
+
+      /* Both statements are not in the current basic block, use SSA names'
+	 DECL_UIDs and versions to determine order.  */
+      if (bb1 != cur_bb && bb2 != cur_bb)
+	{
+	  tree v1 = SSA_NAME_VAR (opnd1);
+	  tree v2 = SSA_NAME_VAR (opnd2);
+	  if (v1 == v2)
+	    return SSA_NAME_VERSION (opnd1) - SSA_NAME_VERSION (opnd2);
+	  else
+	    return DECL_UID (v1) - DECL_UID (v2);
+	}
 
       if (bb1 != cur_bb)
         return -1;
@@ -4221,15 +4269,18 @@ use_stmt_pos_cmp (const void *p1, const void *p2)
 {
   basic_block b1, b2;
   gimple s1, s2, phi, s;
-  use_operand_p phi_use;
+  use_operand_p phi_use, use;
   enum gimple_code c1, c2;
   int idx;
   edge use_edge;
   const use_operand_p u1 = *(const use_operand_p *)p1;
   const use_operand_p u2 = *(const use_operand_p *)p2;
+  ssa_op_iter iter;
 
-  s1 = u1->loc.stmt;
-  s2 = u2->loc.stmt;
+  gcc_assert(u1 != u2);
+
+  s1 = USE_STMT (u1);
+  s2 = USE_STMT (u2);
   c1 = gimple_code (s1);
   c2 = gimple_code (s2);
 
@@ -4243,11 +4294,57 @@ use_stmt_pos_cmp (const void *p1, const void *p2)
       b1 = gimple_bb (s1);
       b2 = gimple_bb (s2);
 
-      return b2->index - b1->index;
+      if (b2->index != b1->index)
+        return b2->index - b1->index;
+
+      /* Uses occur in the same basic block.  */
+      if (s1 == s2)
+	{
+	  /* The uses appear in the same statement, use positions to
+ 	     determine order.  We cannot order by SSA names because they
+	     can refer to the same SSA name.  */
+	  FOR_EACH_SSA_USE_OPERAND (use, s1, iter, SSA_OP_USE)
+	    {
+	      if (use == u1)
+		return -1;
+	      if (use == u2)
+		return 1;
+	    }
+	  gcc_unreachable();
+	}
+      else
+	{
+	  /* This cannot happen.  */
+	  gcc_unreachable();
+	}
     }
 
   if (c1 == GIMPLE_PHI && c2 == GIMPLE_PHI)
-    return gimple_bb (s2)->index - gimple_bb (s1)->index;
+    {
+      if (gimple_bb (s2)->index - gimple_bb (s1)->index)
+        return gimple_bb (s2)->index - gimple_bb (s1)->index;
+
+      if (s1 == s2)
+	{
+	  /* The uses appear in the same PHI, use positions to
+ 	     determine order.  We cannot order by SSA names because they
+	     can refer to the same SSA name.  */
+	  gcc_assert(PHI_ARG_INDEX_FROM_USE (u1) - PHI_ARG_INDEX_FROM_USE (u2));
+	  return PHI_ARG_INDEX_FROM_USE (u1) - PHI_ARG_INDEX_FROM_USE (u2);
+	}
+      else
+	{
+	  tree result1 = gimple_phi_result (s1);
+	  tree result2 = gimple_phi_result (s2);
+	  tree var1 = SSA_NAME_VAR (result1);
+	  tree var2 = SSA_NAME_VAR (result2);
+
+	  if (var1 == var2)
+	    return SSA_NAME_VERSION (result2) - SSA_NAME_VERSION (result1);
+	  else
+	    return DECL_UID (var2) - DECL_UID (var1);
+	}
+    }
 
   if (c1 == GIMPLE_PHI)
     {
@@ -5263,7 +5360,7 @@ dump_refed_vvars (FILE *dump_file, lrs_region_p region)
 static void
 dump_use_ref_set (FILE *file, sbitmap bitvec, tree *mapping)
 {
-  size_t i = 0;
+  unsigned i = 0;
   sbitmap_iterator bi;
   bool first = true;
 
@@ -5290,12 +5387,12 @@ static void
 dump_register_pressure (FILE *file, sbitmap bitvec,
                         lrs_region_p region)
 {
-  size_t gr_pressure = 0;
-  size_t fr_pressure = 0;
+  unsigned gr_pressure = 0;
+  unsigned fr_pressure = 0;
 
   get_num_live_lrs (bitvec, region, &gr_pressure, &fr_pressure);
 
-  fprintf (file, " \n\t[REG PRESSURE: gr = %d, fr = %d]", 
+  fprintf (file, " \n\t[REG PRESSURE: gr = %u, fr = %u]", 
            gr_pressure, fr_pressure);
 }
 
@@ -5328,7 +5425,7 @@ dump_data_flow_bb (FILE *file, basic_block bb, int bb_ridx,
                     mapping);
   fprintf (file, "\n");
 
-  fprintf (file, "\tREG PRESSURE: gr = %d, fr = %d\n",
+  fprintf (file, "\tREG PRESSURE: gr = %u, fr = %u\n",
            region->bb_reg_pressures[lrc_gr][bb_ridx],
            region->bb_reg_pressures[lrc_fr][bb_ridx]);
 
@@ -5384,11 +5481,11 @@ dump_data_flow_result (lrs_region_p region, const char* phase)
   dump_refed_names (dump_file, region);
   dump_refed_vvars (dump_file, region);
 
-  fprintf (dump_file, "\tREG PRESSURE: gr = %d, fr = %d\n",
+  fprintf (dump_file, "\tREG PRESSURE: gr = %u, fr = %u\n",
            region->reg_pressure[lrc_gr],
            region->reg_pressure[lrc_fr]);
 
-  fprintf (dump_file, "\tAVAIL REGS: gr = %d, fr = %d\n",
+  fprintf (dump_file, "\tAVAIL REGS: gr = %u, fr = %u\n",
            region->available_regs[lrc_gr],
            region->available_regs[lrc_fr]);
 
@@ -5418,7 +5515,7 @@ static void
 dump_rd_set (FILE *file, sbitmap bitvec, 
              VEC(tree, heap) *refed_vnames)
 {
-  size_t i = 0;
+  unsigned i = 0;
   sbitmap_iterator bi;
   bool first = true;
 

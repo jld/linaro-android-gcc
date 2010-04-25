@@ -2235,3 +2235,39 @@ gcc/combine.c
   in which a floating point mode RTX is unsafely optimized.
   Owner: dougkwan
   Status: backport of upstream rev 152443.
+
+gcc/configure.ac
+gcc/configure
+  Fix a problem where the gcc configure script checks for particular
+  versions of ld for certain features when building with gold as the linker.
+  Owner: dougkwan
+  Status: Not yet upstream.
+
+gcc/tree-ssa-lrs.c
+  Port CL-39082 and CL-38762 from x86 gcc-4.4.0 to Android branch.
+  Owner: dougkwan
+  Status: Not yet upstream.
+
+gcc/tree-ssa-lrs.c
+  Port CL-39388 from x86 gcc-4.4.0 to Android branch to stabilize qsort
+  comparators.
+  Owner: dougkwan
+  Status: Not yet upstream.
+
+gcc/tree-ssa-lrs.c
+  Port CL-39443 from x86 gcc-4.4.0 to Android branch to stabilize qsort
+  comparators.
+  Owner: dougkwan
+  Status: Not yet upstream.
+
+gcc/tree-ssa-reassoc.c
+  Port CL-39465 from x86 gcc-4.4.0 to Android branch to stabilize qsort in
+  tree-ssa-reassoc.c
+  Owner: dougkwan
+  Status: Not yet upstream.
+
+gcc/config/arm/eabi.h
+  Add GNU-stack annotation to all Android code to fix a potential serious
+  security problem. http://b/issue?id=2623907.
+  Owner: jingyu
+  Status: google local
