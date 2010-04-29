@@ -2,6 +2,25 @@ This is a modified version of gcc-4.2.1 for Android. It is based on a Google
 customized gcc-4.2.1.  The Google specific changes are documented in 
 README.google.  In addition, this gcc also contains the following changes.
 
+2010-04-29  Jing Yu  <jingyu@google.com>
+
+	Add GNU-stack to generated code to enhance security. Port from
+	http://gcc.gnu.org/ml/gcc-patches/2006-11/msg00119.html
+	and also add a local patch which enforces eabi target to include
+	the GNU-stack annotation.
+
+	Changed Files:
+
+	gcc/config/arm/linux-elf.h
+	gcc/config/arm/arm.c
+	gcc/config/arm/arm.h
+	gcc/config/arm/lib1funcs.asm
+	gcc/config/arm/crti.asm
+	gcc/config/arm/crtn.asm
+	gcc/config/arm/libunwind.S
+	gcc/config/arm/eabi.h
+
+
 2009-03-19  Doug Kwan  <dougkwan@google.com>
 
 	Fix two bugs that caused different code to be generated on Linux
