@@ -129,3 +129,6 @@
 "%{mandroid: %(endfile_android) ;" \
 "          : %(endfile_default)}"
 
+/* Add .note.GNU-stack.  */
+#undef NEED_INDICATE_EXEC_STACK
+#define NEED_INDICATE_EXEC_STACK       1

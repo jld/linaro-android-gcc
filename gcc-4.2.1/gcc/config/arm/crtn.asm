@@ -30,6 +30,11 @@
 #    This exception does not however invalidate any other reasons why
 #    the executable file might be covered by the GNU General Public License.
 # 
+/* An executable stack is *not* required for these functions.  */
+#if defined(__ELF__) && defined(__linux__)
+.section .note.GNU-stack,"",%progbits
+.previous
+#endif
 
 # This file just makes sure that the .fini and .init sections do in
 # fact return.  Users may put any desired instructions in those sections.
