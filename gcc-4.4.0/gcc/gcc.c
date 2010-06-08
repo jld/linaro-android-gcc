@@ -737,7 +737,11 @@ proper position among the other output files.  */
 #ifndef LINK_COMMAND_SPEC
 #define LINK_COMMAND_SPEC "\
 %{!fsyntax-only:%{!c:%{!M:%{!MM:%{!E:%{!S:\
-    %(linker) %l " LINK_PIE_SPEC "%X %{o*} %{A} %{d} %{e*} %{m} %{N} %{n} %{r}\
+    %(linker) %l " LINK_PIE_SPEC \
+   "%{fuse-ld=gold:%{fuse-ld=bfd:%e-fuse-ld=gold and -fuse-ld=bfd may not be used together}} \
+    %{fuse-ld=gold:-use-gold} \
+    %{fuse-ld=bfd:-use-ld}" \
+   "%X %{o*} %{A} %{d} %{e*} %{m} %{N} %{n} %{r}\
     %{s} %{t} %{u*} %{x} %{z} %{Z} %{!A:%{!nostdlib:%{!nostartfiles:%S}}}\
     %{static:} %{L*} %(mfwrap) %(link_libgcc) %o\
     %{fopenmp|ftree-parallelize-loops=*:%:include(libgomp.spec)%(link_gomp)} %(mflib)\

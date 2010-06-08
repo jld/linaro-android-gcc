@@ -380,7 +380,7 @@ Objective-C and Objective-C++ Dialects}.
 -funit-at-a-time -funroll-all-loops -funroll-loops @gol
 -funsafe-loop-optimizations -funsafe-math-optimizations -funswitch-loops @gol
 -fvariable-expansion-in-unroller -fvect-cost-model -fvpt -fweb @gol
--fwhole-program @gol
+-fwhole-program -fuse-ld @gol
 --param @var{name}=@var{value}
 -O  -O0  -O1  -O2  -O3  -Os}
 
@@ -6778,6 +6778,16 @@ programs since the functions and variables become local for the whole combined
 compilation unit, not for the single source file itself.
 
 This option is not supported for Fortran programs.
+
+@item -fuse-ld=gold
+Use the @command{ld.gold} linker instead of the default linker.
+This option is only necessary if GCC has been configured with
+@option{--enable-gold=both} or @option{--enable-gold=both/ld}.
+
+@item -fuse-ld=bfd
+Use the @command{ld.bfd} linker instead of the default linker.
+This option is only necessary if GCC has been configured with
+@option{--enable-gold=both/gold}.
 
 @item -fcprop-registers
 @opindex fcprop-registers

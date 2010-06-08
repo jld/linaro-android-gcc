@@ -766,6 +766,8 @@ int
 main (int argc, char **argv)
 {
   static const char *const ld_suffix	= "ld";
+  static const char *const gold_suffix       = "ld.gold";
+  static const char *const bfd_ld_suffix     = "ld.bfd";
   static const char *const real_ld_suffix = "real-ld";
   static const char *const collect_ld_suffix = "collect-ld";
   static const char *const nm_suffix	= "nm";
@@ -784,6 +786,10 @@ main (int argc, char **argv)
 
   const char *const full_ld_suffix =
     concat(target_machine, "-", ld_suffix, NULL);
+  const char *const full_gold_suffix =
+    concat(target_machine, "-", gold_suffix, NULL);
+  const char *const full_bfd_ld_suffix =
+    concat(target_machine, "-", bfd_ld_suffix, NULL);
   const char *const full_nm_suffix =
     concat (target_machine, "-", nm_suffix, NULL);
   const char *const full_gnm_suffix =
@@ -798,6 +804,8 @@ main (int argc, char **argv)
     concat (target_machine, "-", gstrip_suffix, NULL);
 #else
   const char *const full_ld_suffix	= ld_suffix;
+  const char *const full_gold_suffix	= gold_suffix;
+  const char *const full_bfd_ld_suffix	= bfd_ld_suffix;
   const char *const full_nm_suffix	= nm_suffix;
   const char *const full_gnm_suffix	= gnm_suffix;
 #ifdef LDD_SUFFIX
@@ -818,6 +826,13 @@ main (int argc, char **argv)
   const char **c_ptr;
   char **ld1_argv;
   const char **ld1;
+  enum linker_select
+  {
+    DEF_LINKER,
+    GOLD_LINKER,
+    BFD_LINKER
+  } selected_linker = DEF_LINKER;
+  
   char **ld2_argv;
   const char **ld2;
   char **object_lst;
@@ -875,6 +890,10 @@ main (int argc, char **argv)
       {
 	if (! strcmp (argv[i], "-debug"))
 	  debug = 1;
+	else if (! strcmp (argv[i], "-use-gold"))
+	  selected_linker = GOLD_LINKER;
+	else if (! strcmp (argv[i], "-use-ld"))
+	  selected_linker = BFD_LINKER;
       }
     vflag = debug;
   }
@@ -954,12 +973,80 @@ main (int argc, char **argv)
     ld_file_name = find_a_file (&cpath, collect_ld_suffix);
   /* Search the compiler directories for `ld'.  We have protection against
      recursive calls in find_a_file.  */
-  if (ld_file_name == 0)
-    ld_file_name = find_a_file (&cpath, ld_suffix);
+  if (ld_file_name == NULL)
+    switch (selected_linker)
+      {
+      default:
+      case DEF_LINKER:
+	ld_file_name = find_a_file (&cpath, ld_suffix);
+	break;
+      case GOLD_LINKER:
+	ld_file_name = find_a_file (&cpath, gold_suffix);
+	break;
+      case BFD_LINKER:
+	ld_file_name = find_a_file (&cpath, bfd_ld_suffix);
+	break;
+      }
   /* Search the ordinary system bin directories
      for `ld' (if native linking) or `TARGET-ld' (if cross).  */
-  if (ld_file_name == 0)
-    ld_file_name = find_a_file (&path, full_ld_suffix);
+  if (ld_file_name == NULL)
+    switch (selected_linker)
+      {
+      default:
+      case DEF_LINKER:
+	ld_file_name = find_a_file (&path, full_ld_suffix);
+	break;
+      case GOLD_LINKER:
+	ld_file_name = find_a_file (&path, full_gold_suffix);
+	break;
+      case BFD_LINKER:
+	ld_file_name = find_a_file (&path, full_bfd_ld_suffix);
+	break;
+      }
+  
+  if ((vflag || debug) && ld_file_name == NULL)
+    {
+      struct prefix_list * p;
+      const char * s;
+
+      notice ("collect2: warning: unable to find linker.\n");
+
+#ifdef DEFAULT_LINKER
+      notice (" Searched for this absolute executable:\n");
+      notice (" %s\n", DEFAULT_LINKER);
+#endif
+
+      notice (" Searched in these paths:\n");
+      for (p = cpath.plist; p != NULL; p = p->next)
+	notice ("  %s\n", p->prefix);
+      notice (" For these executables:\n");
+      notice ("  %s\n", real_ld_suffix);
+      notice ("  %s\n", collect_ld_suffix);
+      switch (selected_linker)
+	{
+	default:
+	case DEF_LINKER:    s = ld_suffix; break;
+	case GOLD_LINKER:   s = gold_suffix; break;
+	case BFD_LINKER:    s = bfd_ld_suffix; break;
+	}
+      notice ("  %s\n", s);
+
+      notice (" And searched in these paths:\n");
+      for (p = path.plist; p != NULL; p = p->next)
+	notice ("  %s\n", p->prefix);
+      notice (" For these executables:\n");
+#ifdef REAL_LD_FILE_NAME
+      notice (" %s\n", REAL_LD_FILE_NAME);
+#endif
+      switch (selected_linker)
+	{
+	default:
+	case DEF_LINKER:    s = full_ld_suffix; break;
+	case GOLD_LINKER:   s = full_gold_suffix; break;
+	case BFD_LINKER:    s = full_bfd_ld_suffix; break;
+	}
+      notice ("  %s\n", s);
+    }
 
 #ifdef REAL_NM_FILE_NAME
   nm_file_name = find_a_file (&path, REAL_NM_FILE_NAME);

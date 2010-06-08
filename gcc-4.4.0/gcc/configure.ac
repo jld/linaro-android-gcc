@@ -1969,6 +1969,17 @@ else
         AC_PATH_PROG(gcc_cv_ld, $LD_FOR_TARGET)
 fi])
 
+gcc_cv_ld_gold_srcdir=`echo $srcdir | sed -e 's,/gcc$,,'`/gold
+
+AS_VAR_SET_IF(gcc_cv_gold,, [
+if test -f $gcc_cv_ld_gold_srcdir/configure.ac \
+     && test -f ../gold/Makefile \
+     && test x$build = x$host; then
+	gcc_cv_gold=../gold/ld-new$build_exeext
+else
+        gcc_cv_gold=''
+fi])
+
 # Check to see if we are using gold instead of ld
 AC_MSG_CHECKING(whether we are using gold)
 ld_is_gold=no
@@ -1986,6 +1997,9 @@ case "$ORIGINAL_LD_FOR_TARGET" in
   ./collect-ld | ./collect-ld$build_exeext) ;;
   *) AC_CONFIG_FILES(collect-ld:exec-tool.in, [chmod +x collect-ld]) ;;
 esac 
+
+ORIGINAL_GOLD_FOR_TARGET=$gcc_cv_gold
+AC_SUBST(ORIGINAL_GOLD_FOR_TARGET)
 
 AC_MSG_CHECKING(what linker to use)
 if test "$gcc_cv_ld" = ../ld/ld-new$build_exeext; then

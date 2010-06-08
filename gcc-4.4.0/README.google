@@ -2271,3 +2271,23 @@ gcc/config/arm/eabi.h
   security problem. http://b/issue?id=2623907.
   Owner: jingyu
   Status: google local
+
+gcc/ira-conflicts.c
+  Backport a gcc-4.4.3 patch to fix a ra bug http://b/issue?id=2667593.
+  http://gcc.gnu.org/ml/gcc-cvs/2009-05/msg00055.html
+  Owner: jingyu
+  Status: In upstream gcc-4.4.3 r147081.
+
+gcc/collect2.c
+gcc/common.opt
+gcc/configure.ac
+gcc/configure
+gcc/doc/invoke.texi
+gcc/exec-tool.in
+gcc/gcc.c
+gcc/opts.c
+  Add -fuse-ld= option to select linker.  This CL merges the gcc part of
+  this up-stream patch.
+  http://gcc.gnu.org/ml/gcc-patches/2010-04/msg00402.html
+  Owner: dougkwan
+  Status: binutils part in upstream, gcc part pending approval.
