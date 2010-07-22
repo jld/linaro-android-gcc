@@ -1,5 +1,0 @@
-# Config mandroid multilib.
-# -mandroind implies -mthumb-interwork.
-MLOPT_mandroid		= mandroid
-MLDIR_mandroid		= android
-MLEXCEPT_mandroid	= *mthumb-interwork/*mandroid*

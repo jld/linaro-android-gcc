@@ -4131,7 +4131,7 @@ fi
   ## (Right now, this only matters for enable_wchar_t, but nothing prevents
   ## other macros from doing the same.  This should be automated.)  -pme
 
-  # Check for uClibc since Linux platforms use different configuration
+  # Check for C library flavor since Linux platforms use different configuration
   # directories depending on the C library in use.
   cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
@@ -4151,6 +4151,24 @@ if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
   uclibc=yes
 else
   uclibc=no
+fi
+rm -f conftest*
+
+
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+  #include <stdio.h>
+  #if __BIONIC__
+    _using_bionic
+  #endif
+
+_ACEOF
+if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
+  $EGREP "_using_bionic" >/dev/null 2>&1; then :
+  bionic=yes
+else
+  bionic=no
 fi
 rm -f conftest*
 
@@ -5730,7 +5748,7 @@ ia64-*-hpux*)
   ;;
 *-*-irix6*)
   # Find out which ABI we are using.
-  echo '#line 5733 "configure"' > conftest.$ac_ext
+  echo '#line 5751 "configure"' > conftest.$ac_ext
   if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
   (eval $ac_compile) 2>&5
   ac_status=$?
@@ -11257,7 +11275,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 11260 "configure"
+#line 11278 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -11353,7 +11371,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 11356 "configure"
+#line 11374 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -14607,7 +14625,7 @@ fi;
     #
     # Fake what AC_TRY_COMPILE does.  XXX Look at redoing this new-style.
     cat > conftest.$ac_ext << EOF
-#line 14610 "configure"
+#line 14628 "configure"
 struct S { ~S(); };
 void bar();
 void foo()
@@ -14779,7 +14797,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
   # unnecessary for a builtins test.
 
     cat > conftest.$ac_ext << EOF
-#line 14782 "configure"
+#line 14800 "configure"
 int main()
 {
   typedef bool atomic_type;
@@ -14818,7 +14836,7 @@ echo "${ECHO_T}$enable_atomic_builtinsb" >&6
     rm -f conftest*
 
     cat > conftest.$ac_ext << EOF
-#line 14821 "configure"
+#line 14839 "configure"
 int main()
 {
   typedef short atomic_type;
@@ -14857,7 +14875,7 @@ echo "${ECHO_T}$enable_atomic_builtinss" >&6
     rm -f conftest*
 
     cat > conftest.$ac_ext << EOF
-#line 14860 "configure"
+#line 14878 "configure"
 int main()
 {
   // NB: _Atomic_word not necessarily int.
@@ -14897,7 +14915,7 @@ echo "${ECHO_T}$enable_atomic_builtinsi" >&6
     rm -f conftest*
 
     cat > conftest.$ac_ext << EOF
-#line 14900 "configure"
+#line 14918 "configure"
 int main()
 {
   typedef long long atomic_type;

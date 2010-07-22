@@ -2016,8 +2016,52 @@ gcc/simplify-got.c
   Owner: jingyu
   Status: google local
 
+config.sub
+gcc/config.gcc
+gcc/config/linux.h
+gcc/config/linux.opt
+gcc/config/alpha/linux-elf.h
+gcc/config/alpha/linux.h
+gcc/config/rs6000/linux.h
+gcc/config/rs6000/linux64.h
+gcc/config/rs6000/sysv4.h
+gcc/doc/invoke.texi
+gcc/testsuite/gcc.dg/glibc-uclibc-1.c
+gcc/testsuite/gcc.dg/glibc-uclibc-2.c
+gcc/config/arm/eabi.h
+gcc/config/arm/eabi.opt
+gcc/config/arm/t-linux-androideabi
+gcc/config/arm/t-arm-elf
+gcc/config/arm/t-mlib-armv7a
+gcc/config/arm/t-mlib-mandroid
+gcc/config/linux-android.h
+gcc/config/linux-android.opt
+gcc/gthr-posix.h
+libstdc++-v3/acinclude.m4
+libstdc++-v3/config/os/bionic/ctype_base.h
+libstdc++-v3/config/os/bionic/ctype_inline.h
+libstdc++-v3/config/os/bionic/ctype_noninline.h
+libstdc++-v3/config/os_bionic/os_defines.h
+libstdc++-v3/configure
+libstdc++-v3/configure.host
+  Backport androideabi target and bionic support from upstream. Remove local
+  mandroid patch (CL39911-p2) and local multilib patch (CL40150-p2).
+  Owner: jingyu
+  Status: Back port upstream patches: r159820, r159917, r159918, r159978,
+  r160095, r160096
+
+gcc/config/linux.h
+  Disable sincos optimization for Android target.
+  Owner: jingyu
+  Status: keep it local
+
 gcc/config/arm/arm.c
 gcc/config/arm/thumb2.md
   Fix a problematic pattern which crashes Android browser and camera.
   Owner: jingyu
   Status: Back port upstream patch r157942
+
+gcc/config/arm/arm.h
+  Add .note.GNU-stack annotation to all ARM targeted codes.
+  Owner: jingyu
+  Status: keep it local

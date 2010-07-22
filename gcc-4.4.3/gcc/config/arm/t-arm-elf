@@ -47,10 +47,6 @@ MULTILIB_MATCHES 	+= $(MLMATCH_armv7a)
 # MULTILIB_OPTIONS    += mno-thumb-interwork/mthumb-interwork
 # MULTILIB_DIRNAMES   += normal interwork
 
-MULTILIB_OPTIONS      += $(MLOPT_mandroid)
-MULTILIB_DIRNAMES     += $(MLDIR_mandroid)
-MULTILIB_EXCEPTIONS   += $(MLEXCEPT_mandroid)
-
 # MULTILIB_OPTIONS    += fno-leading-underscore/fleading-underscore
 # MULTILIB_DIRNAMES   += elf under
 # 

@@ -461,8 +461,7 @@ Objective-C and Objective-C++ Dialects}.
 -mcaller-super-interworking  -mcallee-super-interworking @gol
 -mtp=@var{name} @gol
 -mword-relocations @gol
--mfix-cortex-m3-ldrd @gol
--mandroid}
+-mfix-cortex-m3-ldrd @gol}
 
 @emph{AVR Options}
 @gccoptlist{-mmcu=@var{mcu}  -msize  -mno-interrupts @gol
@@ -555,7 +554,8 @@ Objective-C and Objective-C++ Dialects}.
 -mcpu=@var{cpu}}
 
 @emph{GNU/Linux Options}
-@gccoptlist{-muclibc}
+@gccoptlist{-mglibc -muclibc -mbionic -mandroid @gol
+-tno-android-cc -tno-android-ld}
 
 @emph{H8/300 Options}
 @gccoptlist{-mrelax  -mh  -ms  -mn  -mint32  -malign-300}
@@ -9601,38 +9601,6 @@ Only generate absolute relocations on word sized values (i.e. R_ARM_ABS32).
 This is enabled by default on targets (uClinux, SymbianOS) where the runtime
 loader imposes this restriction, and when @option{-fpic} or @option{-fPIC}
 is specified.
-
-@item -mandroid
-@opindex mandroid
-Enable Android specific compilier options.
-
-If this option is used, a preprocessor macro @code{__ANDROID__} is defined
-and has the value 1 during compilation. The option also implies C/C++ options
-@option{-fno-exceptions} @option{-fpic} @option{-mthumb-interwork}
-@option{-fno-short-enums} and C++ option @option{-fno-rtti}. These implied
-options can be overridden. For example RTTI in C++ code can still be enabled
-with -frtti even when -mandroid is also used.
-
-Linking options depend on whether a static executable, a dynamic
-executable or a shared library is built. When @option{-static} is given,
-@option{-mandroid} implies linking flag @option{-Bstatic}, start file
-@file{crtbegin_static.o} and end file @file{crtend_android.o}.
-
-When @option{-shared} is given, @option{-mandroid} implies the linking
-flag @option{-Bsymbolic} and no start and end files.
-
-When none of @option{-static} and @option{-shared} is given, @option{-mandroid}
-implies linking flags @option{-Bdynamic -dynamic-linker /system/bin/linker},
-start file @file{crtbegin_dynamic.o} and end file @file{crtend_android.o}. The
-dynamic linker used can be overriden by another @option{-dynamic-linker} in
-command line.
-
-The linking option @option{-ldl} is also added if @option{-static} is not
-given.
-
-If more than one of @option{-dynamic}, @option{-static} and @option{-shared}
-are given, behaviour of @option{-mandroid} is undefined.
-
 @end table
 
 @node AVR Options
@@ -10995,13 +10963,41 @@ These @samp{-m} options are defined for GNU/Linux targets:
 @table @gcctabopt
 @item -mglibc
 @opindex mglibc
-Use the GNU C library instead of uClibc.  This is the default except
-on @samp{*-*-linux-*uclibc*} targets.
+Use the GNU C library.  This is the default except
+on @samp{*-*-linux-*uclibc*} and @samp{*-*-linux-*android*} targets.
 
 @item -muclibc
 @opindex muclibc
-Use uClibc instead of the GNU C library.  This is the default on
+Use uClibc C library.  This is the default on
 @samp{*-*-linux-*uclibc*} targets.
+
+@item -mbionic
+@opindex mbionic
+Use Bionic C library.  This is the default on
+@samp{*-*-linux-*android*} targets.
+
+@item -mandroid
+@opindex mandroid
+Compile code compatible with Android platform.  This is the default on
+@samp{*-*-linux-*android*} targets.
+
+When compiling, this option enables @option{-mbionic}, @option{-fPIC},
+@option{-fno-exceptions} and @option{-fno-rtti} by default.  When linking,
+this option makes the GCC driver pass Android-specific options to the linker.
+Finally, this option causes the preprocessor macro @code{__ANDROID__}
+to be defined.
+
+@item -tno-android-cc
+@opindex tno-android-cc
+Disable compilation effects of @option{-mandroid}, i.e., do not enable
+@option{-mbionic}, @option{-fPIC}, @option{-fno-exceptions} and
+@option{-fno-rtti} by default.
+
+@item -tno-android-ld
+@opindex tno-android-ld
+Disable linking effects of @option{-mandroid}, i.e., pass standard Linux
+linking options to the linker.
+
 @end table
 
 @node H8/300 Options

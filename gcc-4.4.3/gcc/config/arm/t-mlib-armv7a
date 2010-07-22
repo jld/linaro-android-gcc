@@ -1,4 +1,0 @@
-# Config armv7-a multilib.
-MLOPT_armv7a		= march=armv7-a
-MLDIR_armv7a		= armv7a
-MLMATCH_armv7a		= march?armv7-a=mcpu?cortex-a8
