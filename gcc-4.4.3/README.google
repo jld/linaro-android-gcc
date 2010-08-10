@@ -2065,3 +2065,8 @@ gcc/config/arm/arm.h
   Add .note.GNU-stack annotation to all ARM targeted codes.
   Owner: jingyu
   Status: keep it local
+
+libiberty/getpagesize.c
+  Local work around for building C++ library for Android toolchain.
+  Owner: jingyu
+  Status: keep it local

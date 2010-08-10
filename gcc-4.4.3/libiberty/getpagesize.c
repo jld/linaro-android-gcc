@@ -60,12 +60,13 @@ BUGS
 # endif /* PAGESIZE */
 #endif /* GNU_OUR_PAGESIZE */
 
+#if DEFAULT_LIBC != LIBC_BIONIC
 int
 getpagesize (void)
 {
   return (GNU_OUR_PAGESIZE);
 }
-
+#endif
 #else /* VMS */
 
 #if 0	/* older distributions of gcc-vms are missing <syidef.h> */
