@@ -2066,7 +2066,19 @@ gcc/config/arm/arm.h
   Owner: jingyu
   Status: keep it local
 
+gcc/config/arm/thumb2.md
+  Replace tst instruction with lsls for a single bit test.
+  Owner: carrot
+  Status: back port of upstream GCC 4.6.0 patches 161344, 161929, 161930.
+
 libiberty/getpagesize.c
   Local work around for building C++ library for Android toolchain.
   Owner: jingyu
   Status: keep it local
+
+gcc/testsuite/g++.dg/torture/pr45709-2.C
+gcc/testsuite/g++.dg/torture/pr45709.C
+gcc/tree-inline.c
+  Backport r164399 from upstream gcc-4_4-branch (b/3068369).
+  Owner: raksit
+  Status: In upstream branches 4.3 and onwards.
