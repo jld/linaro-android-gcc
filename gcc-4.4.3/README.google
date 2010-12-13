@@ -2082,3 +2082,9 @@ gcc/tree-inline.c
   Backport r164399 from upstream gcc-4_4-branch (b/3068369).
   Owner: raksit
   Status: In upstream branches 4.3 and onwards.
+
+gcc/config/arm/arm.md
+  Fix bug 3264814, which was caused by missing dependencies of a previous back
+  port.
+  Owner: dougkwan
+  Status: local.
