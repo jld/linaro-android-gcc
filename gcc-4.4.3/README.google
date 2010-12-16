@@ -2083,6 +2083,11 @@ gcc/tree-inline.c
   Owner: raksit
   Status: In upstream branches 4.3 and onwards.
 
+gcc/config/arm/cortex-a9.md
+  Cortex A9 machine description enhancement.
+  Owner: carrot
+  Status: back ported from upstream GCC 4.5 r153779.
+
 gcc/config/arm/arm.md
   Fix bug 3264814, which was caused by missing dependencies of a previous back
   port.
