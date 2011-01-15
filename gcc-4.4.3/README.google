@@ -2111,3 +2111,10 @@ gcc/testsuite/g++.dg/init/ref15.C
   Back port upstream fixes r156042 and r148110 to fix broken tests.
   Owner: dougkwan
   Status: in upstream.
+
+libstdc++-v3/config/locale/generic/c_locale.cc
+libstdc++-v3/config/locale/generic/c_locale.h
+libstdc++-v3/config/locale/generic/time_members.cc
+  Hanlde NULL return value of setlocale(), required by bionic.
+  Owner: jingyu
+  Status: local
