@@ -1,5 +1,5 @@
 // { dg-do compile }
-// { dg-options "-Wnull-conversion" }
+// { dg-options "-Wconversion-null" }
 
 #include <stddef.h>
 

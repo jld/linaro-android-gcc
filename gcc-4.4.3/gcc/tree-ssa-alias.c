@@ -191,6 +191,7 @@ struct alias_info
 
   /* Pointers that have been used in an indirect load/store operation.  */
   struct pointer_set_t *dereferenced_ptrs;
+
 };
 
 
@@ -2119,7 +2120,6 @@ delete_alias_info (struct alias_info *ai)
   delete_points_to_sets ();
 }
 
-
 /* Used for hashing to identify pointer infos with identical
    pt_vars bitmaps.  */
 
@@ -2456,6 +2456,26 @@ create_alias_map_for (tree var, struct alias_info *ai)
   ai->addressable_vars[ai->num_addressable_vars++] = alias_map;
 }
 
+/* For indirect reference REF with integer address, create
+   a .GLOBAL_VAR for it if needed.  */
+
+static void
+create_global_var_for_literal_addr (tree ref)
+{
+  if (gimple_global_var (cfun) != NULL)
+    return;
+
+  if (handled_component_p (ref))
+    ref = get_base_address (ref);
+
+  if (!ref)
+    return;
+
+  if (INDIRECT_REF_P (ref)
+      && TREE_CODE (TREE_OPERAND (ref, 0)) == INTEGER_CST
+      && !integer_zerop (TREE_OPERAND (ref, 0)))
+    create_global_var ();
+}
 
 /* Update related alias information kept in AI.  This is used when
    building name tags, alias sets and deciding grouping heuristics.
@@ -2504,7 +2524,17 @@ update_alias_info_1 (gimple stmt, struct alias_info *ai)
 	      && TREE_CODE (var) != RESULT_DECL
 	      && is_gimple_reg_type (TREE_TYPE (var)))
 	    bitmap_set_bit (gimple_addressable_vars (cfun), DECL_UID (var));
+
 	}
+
+      if (lhs)
+        create_global_var_for_literal_addr (lhs);
+      if (gimple_code (stmt) == GIMPLE_ASSIGN)
+        {
+          tree rhs = gimple_assign_rhs1 (stmt);
+
+          create_global_var_for_literal_addr (rhs);
+        }
     }
 
   /* Process each operand use.  For pointers, determine whether they

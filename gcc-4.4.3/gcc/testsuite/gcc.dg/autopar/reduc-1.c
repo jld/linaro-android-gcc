@@ -12,7 +12,7 @@ unsigned int uc[N] = {1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 
 /* Reduction of unsigned-int.  */
 
-void main1 (unsigned int x, unsigned int max_result, unsigned int min_result)
+void __attribute__((noinline)) main1 (unsigned int x, unsigned int max_result, unsigned int min_result)
 {
   int i;
   unsigned int udiff = 2;

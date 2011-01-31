@@ -669,7 +669,10 @@ c_cpp_builtins (cpp_reader *pfile)
   /* Define a macro indicating whether the thread safety attributes/analysis
      is supported.  */
   if (warn_thread_safety)
-    cpp_define (pfile, "__SUPPORT_TS_ANNOTATION__");
+    {
+      cpp_define (pfile, "__SUPPORT_TS_ANNOTATION__");
+      cpp_define (pfile, "__SUPPORT_DYN_ANNOTATION__");
+    }
 
   /* Tell source code if the compiler makes sync_compare_and_swap
      builtins available.  */

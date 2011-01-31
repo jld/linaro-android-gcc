@@ -1545,10 +1545,21 @@ get_addr_dereference_operands (gimple stmt, tree *addr, int flags,
     }
   else if (TREE_CODE (ptr) == INTEGER_CST)
     {
+      tree literal_addr_tag;
+
       /* If a constant is used as a pointer, we can't generate a real
 	 operand for it but we mark the statement volatile to prevent
 	 optimizations from messing things up.  */
       gimple_set_has_volatile_ops (stmt, true);
+      literal_addr_tag = gimple_global_var (cfun);
+      if (!integer_zerop (ptr)
+          && literal_addr_tag && !(flags & opf_no_vops))
+        {
+          if (flags & opf_def)
+            append_vdef (literal_addr_tag);
+          else
+            append_vuse (literal_addr_tag);
+        }
       return;
     }
   else
@@ -1647,7 +1658,8 @@ add_call_clobber_ops (gimple stmt, tree callee ATTRIBUTE_UNUSED)
     {
       tree var = gimple_global_var (cfun);
       add_virtual_operand (var, stmt, opf_def, NULL, 0, -1, true);
-      return;
+      if (bitmap_empty_p (gimple_call_clobbered_vars (cfun)))
+        return;
     }
 
   /* Get info for local and module level statics.  There is a bit

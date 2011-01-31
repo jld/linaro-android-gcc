@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-Winline -O2 --param inline-unit-growth=0 --param large-unit-insns=0" } */
+/* { dg-options "-Winline -O2 --param inline-unit-growth=0 --param large-unit-insns=0 --param inline-address-not-taken-function-emit-probability=100 --param inline-function-size-adjustment=0" } */
 
 void big (void);
 inline int q(void) /* { dg-warning "inline-unit-growth" } */

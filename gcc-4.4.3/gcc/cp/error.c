@@ -78,6 +78,8 @@ static void dump_template_bindings (tree, tree);
 static void dump_scope (tree, int);
 static void dump_template_parms (tree, int, int);
 
+static int get_non_default_template_args_count (tree, int);
+
 static const char *function_category (tree);
 static void maybe_print_instantiation_context (diagnostic_context *);
 static void print_instantiation_full_context (diagnostic_context *);
@@ -151,17 +153,36 @@ dump_template_argument (tree arg, int flags)
     }
 }
 
+/* Count the number of template arguments ARGS whose value does not
+   match the (optional) default template parameter in PARAMS  */
+
+static int
+get_non_default_template_args_count (tree args, int flags)
+{
+  int n = TREE_VEC_LENGTH (INNERMOST_TEMPLATE_ARGS (args));
+
+  if (/* We use this flag when generating debug information.  We don't
+	 want to expand templates at this point, for this may generate
+	 new decls, which gets decl counts out of sync, which may in
+	 turn cause codegen differences between compilations with and
+	 without -g.  */
+      (flags & TFF_NO_OMIT_DEFAULT_TEMPLATE_ARGUMENTS) != 0)
+    return n;
+
+  return GET_NON_DEFAULT_TEMPLATE_ARGS_COUNT (INNERMOST_TEMPLATE_ARGS (args));
+}
+
 /* Dump a template-argument-list ARGS (always a TREE_VEC) under control
    of FLAGS.  */
 
 static void
 dump_template_argument_list (tree args, int flags)
 {
-  int n = TREE_VEC_LENGTH (args);
+  int n = get_non_default_template_args_count (args, flags);
   int need_comma = 0;
   int i;
 
-  for (i = 0; i< n; ++i)
+  for (i = 0; i < n; ++i)
     {
       tree arg = TREE_VEC_ELT (args, i);
 
@@ -237,18 +258,19 @@ dump_template_bindings (tree parms, tree args)
       int lvl = TMPL_PARMS_DEPTH (parms);
       int arg_idx = 0;
       int i;
+      tree lvl_args = NULL_TREE;
+
+      /* Don't crash if we had an invalid argument list.  */
+      if (TMPL_ARGS_DEPTH (args) >= lvl)
+	lvl_args = TMPL_ARGS_LEVEL (args, lvl);
 
       for (i = 0; i < TREE_VEC_LENGTH (p); ++i)
 	{
 	  tree arg = NULL_TREE;
 
 	  /* Don't crash if we had an invalid argument list.  */
-	  if (TMPL_ARGS_DEPTH (args) >= lvl)
-	    {
-	      tree lvl_args = TMPL_ARGS_LEVEL (args, lvl);
-	      if (NUM_TMPL_ARGS (lvl_args) > arg_idx)
-		arg = TREE_VEC_ELT (lvl_args, arg_idx);
-	    }
+	  if (lvl_args && NUM_TMPL_ARGS (lvl_args) > arg_idx)
+	    arg = TREE_VEC_ELT (lvl_args, arg_idx);
 
 	  if (need_comma)
 	    pp_separate_with_comma (cxx_pp);
@@ -1332,16 +1354,13 @@ dump_template_parms (tree info, int primary, int flags)
   pp_cxx_begin_template_argument_list (cxx_pp);
 
   /* Be careful only to print things when we have them, so as not
-	 to crash producing error messages.  */
+     to crash producing error messages.  */
   if (args && !primary)
     {
       int len, ix;
+      len = get_non_default_template_args_count (args, flags);
 
-      if (TMPL_ARGS_HAVE_MULTIPLE_LEVELS (args))
-	args = TREE_VEC_ELT (args, TREE_VEC_LENGTH (args) - 1);
-
-      len = TREE_VEC_LENGTH (args);
-
+      args = INNERMOST_TEMPLATE_ARGS (args);
       for (ix = 0; ix != len; ix++)
 	{
 	  tree arg = TREE_VEC_ELT (args, ix);

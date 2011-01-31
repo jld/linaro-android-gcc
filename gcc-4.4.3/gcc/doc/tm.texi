@@ -4341,6 +4341,18 @@ specially by the compiler and was not mentioned in the C code being
 compiled.
 @end defmac
 
+@deftypefn {Target Hook} rtx TARGET_LIBCALL_VALUE (enum machine_mode
+@var{mode}, rtx @var{fun})
+Define this hook if the back-end needs to know the name of the libcall
+function in order to determine where the result should be returned.
+
+The mode of the result is given by @var{mode} and the name of the called
+library function is given by @var{fun}.  The hook should return an RTX
+representing the place where the library function result will be returned.
+
+If this hook is not defined, then LIBCALL_VALUE will be used.
+@end deftypefn
+
 @defmac FUNCTION_VALUE_REGNO_P (@var{regno})
 A C expression that is nonzero if @var{regno} is the number of a hard
 register in which the values of called function may come back.
@@ -10687,17 +10699,18 @@ After successful simplify-got optimization, the pic_reg is useless. So a
 target can use this hook to clear pic_reg.
 @end deftypefn
 
-@deftypefn {Target Hook} rtx TARGET_LOADED_GLOBAL_VAR (rtx insn, rtx * offset_reg)
+@deftypefn {Target Hook} rtx TARGET_LOADED_GLOBAL_VAR (rtx @var{insn}, rtx * @var{offset_reg}, rtx * @var{offset_insn})
 This hook is used to detect if the given @var{insn} loads a global
 variable's address from GOT with the form of
 
 @smallexample
-(set @var{address_reg} (mem (plus pic_reg @var{off})))
+(set @var{address_reg} (mem (plus pic_reg @var{offset_reg})))
 @end smallexample
 
-If so store @var{off} into the memory pointed to by @var{offset_reg} and
-return the global variable whose address will be loaded. Otherwise return
-@code{NULL_RTX}.
+If so return the global variable whose address will be loaded and fill in
+@var{offset_insn} and @var{offset_reg}. @var{offset_reg} is set at
+@var{offset_insn} to hold the offset from GOT base to the GOT entry of the
+global variable. Otherwise return @code{NULL_RTX}.
 @end deftypefn
 
 @deftypefn {Target Hook} bool TARGET_CAN_SIMPLIFY_GOT_ACCESS (int @var{n_symbol}, int @var{n_access})
@@ -10707,10 +10720,10 @@ number of accessed symbols. If the returned value is false the GOT access
 insns will not be rewritten. Otherwise we will rewrite these insns.
 @end deftypefn
 
-@deftypefn {Target Hook} void TARGET_LOAD_GLOBAL_ADDRESS (rtx @var{symbol}, rtx @var{offset_reg}, rtx @var{address_reg}, rtx @var{load_insn})
+@deftypefn {Target Hook} void TARGET_LOAD_GLOBAL_ADDRESS (rtx @var{symbol}, rtx @var{offset_reg}, rtx @var{address_reg}, rtx @var{load_insn}, rtx @var{offset_insn})
 This hook does the actual rewriting of GOT access insn @var{load_insn}.
 The global variable is @var{symbol}. The global address should be loaded
-into @var{address_reg}. The register @var{offset_reg} was previously used
-to hold the offset from GOT base to the GOT entry of the global variable.
-Now it can be used as a scratch register.
+into @var{address_reg}. The register @var{offset_reg} was previously set
+in insn @var{offset_insn} to hold the offset from GOT base to the GOT
+entry of the global variable. Now it can be used as a scratch register.
 @end deftypefn

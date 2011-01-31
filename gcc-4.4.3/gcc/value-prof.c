@@ -50,6 +50,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "params.h"
 #include "tree-sample-profile.h"
 
+/* TODO(martint): Switch from math.h to mpfr.h. */
+#include <math.h>
+
 static struct value_prof_hooks *value_prof_hooks;
 
 /* In this file value profile based optimizations are placed.  Currently the
@@ -86,6 +89,7 @@ static tree gimple_divmod_fixed_value (gimple, tree, int, gcov_type, gcov_type);
 static tree gimple_mod_pow2 (gimple, int, gcov_type, gcov_type);
 static tree gimple_mod_subtract (gimple, int, int, int, gcov_type, gcov_type,
 				 gcov_type);
+static bool gimple_float_math_call_transform (gimple_stmt_iterator *);
 static bool gimple_divmod_fixed_value_transform (gimple_stmt_iterator *);
 static bool gimple_mod_pow2_value_transform (gimple_stmt_iterator *);
 static bool gimple_mod_subtract_transform (gimple_stmt_iterator *);
@@ -256,6 +260,20 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
 	}
       fprintf (dump_file, ".\n");
       break;
+    case HIST_TYPE_SINGLE_FLOAT_VALUE:
+      fprintf (dump_file, "Single float value ");
+      if (hist->hvalue.counters)
+        {
+           fprintf (dump_file, "value:%f"
+        	    " match:"HOST_WIDEST_INT_PRINT_DEC
+        	    " wrong:"HOST_WIDEST_INT_PRINT_DEC,
+        	    gcov_type_to_float (hist->hvalue.counters[0]),
+        	    (HOST_WIDEST_INT) hist->hvalue.counters[1],
+        	    (HOST_WIDEST_INT) hist->hvalue.counters[2]);
+        }
+      fprintf (dump_file, ".\n");
+      break;
+
 
     case HIST_TYPE_AVERAGE:
       fprintf (dump_file, "Average value ");
@@ -562,6 +580,65 @@ check_ic_counter (gimple stmt, gcov_type *count1, gcov_type *count2,
   return false;
 }
 
+/* Process the math functions given by --ffvpt-functions=.  */
+struct ffvpt_options_s
+ffvtp_process_options (const char *arg)
+{
+  const char *start = arg;
+
+  struct ffvpt_options_s ffvpt_options;
+  ffvpt_options.exp_set = 0;
+  ffvpt_options.log_set = 0;
+  ffvpt_options.pow_set = 0;
+  ffvpt_options.sqrt_set = 0;
+
+  while (*start)
+    {
+      if (strncmp ("all", start, 3) == 0
+          && (start[4] == '\0' || start[3] == ','))
+        {
+          ffvpt_options.exp_set = 1;
+          ffvpt_options.log_set = 1;
+          ffvpt_options.pow_set = 1;
+          ffvpt_options.sqrt_set = 1;
+          break;
+        }
+
+      if (strncmp ("exp", start, 3) == 0
+          && (start[3] == '\0' || start[3] == ','))
+        ffvpt_options.exp_set = 1;
+      else if (strncmp ("log", start, 3) == 0
+               && (start[3] == '\0' || start[3] == ','))
+        ffvpt_options.log_set = 1;
+      else if (strncmp ("pow", start, 3) == 0
+               && (start[3] == '\0' || start[3] == ','))
+        ffvpt_options.pow_set = 1;
+      else if (strncmp ("sqrt", start, 4) == 0
+               && (start[4] == '\0' || start[4] == ','))
+        ffvpt_options.sqrt_set = 1;
+      else
+        warning (0, "Unsupported function in the beginning of: %qs", start);
+      start = strchr (start,',');
+      if (start != NULL)
+        ++start;
+      else
+        break;
+    }
+  return ffvpt_options;
+}
+
+/* Return if flags allow for ffvpt optimizations. */
+static bool
+do_float_value_profile_transformations (void)
+{
+  return flag_float_value_profile_transformations
+      && (ffvpt_options.exp_set
+          || ffvpt_options.log_set
+          || ffvpt_options.pow_set
+          || ffvpt_options.sqrt_set);
+}
+
+
 
 /* GIMPLE based transformations. */
 
@@ -604,12 +681,14 @@ gimple_value_profile_transformations (void)
 	     current statement remain valid (although possibly
 	     modified) upon return.  */
 	  if (flag_value_profile_transformations
-	      && (gimple_mod_subtract_transform (&gsi)
-		  || gimple_divmod_fixed_value_transform (&gsi)
-		  || gimple_mod_pow2_value_transform (&gsi)
-		  || gimple_stringops_transform (&gsi)
-		  || gimple_ic_transform (stmt)))
-	    {
+	      && ((gimple_mod_subtract_transform (&gsi)
+                   || gimple_divmod_fixed_value_transform (&gsi)
+                   || gimple_mod_pow2_value_transform (&gsi)
+                   || gimple_stringops_transform (&gsi)
+                   || gimple_ic_transform (stmt))
+                  || (do_float_value_profile_transformations ()
+                      && gimple_float_math_call_transform (&gsi))))
+            {
 	      stmt = gsi_stmt (gsi);
 	      changed = true;
 	      /* Original statement may no longer be in the same block. */
@@ -711,7 +790,7 @@ gimple_divmod_fixed_value (gimple stmt, tree value, int prob, gcov_type count,
   e13->count = all - count;
 
   remove_edge (e23);
-  
+
   e24 = make_edge (bb2, bb4, EDGE_FALLTHRU);
   e24->probability = REG_BR_PROB_BASE;
   e24->count = count;
@@ -720,6 +799,209 @@ gimple_divmod_fixed_value (gimple stmt, tree value, int prob, gcov_type count,
   e34->count = all - count;
 
   return tmp2;
+}
+
+
+/* Replace a math function call with a series of statements that check
+   for a specific input value and if found, use a precalculated value.
+e.g.:
+     a = fn(b)
+-->
+     if (b == k_1):     // bb1
+       a = k2           // bb2
+     else
+       a = fn(b)        // bb3
+                        // bb4
+*/
+static tree
+gimple_ffvpt_update_math_calls (gimple stmt, tree value, int prob,
+                                gcov_type count, gcov_type all,
+                                tree new_value_expr)
+{
+
+  gimple stmt1, stmt2, stmt3;
+  tree tmp_b, tmp_a, tmp_k1;
+  gimple bb1end, bb2end, bb3end;
+  basic_block bb, bb2, bb3, bb4;
+  tree optype; /* , calltree; */
+  edge e12, e13, e23, e24, e34;
+  gimple_stmt_iterator gsi;
+
+  gcc_assert (is_gimple_call (stmt));
+
+  optype = TREE_TYPE (gimple_assign_lhs (stmt)); /* double variable */
+
+  bb = gimple_bb (stmt);
+  gsi = gsi_for_stmt (stmt);
+
+  tmp_k1 = create_tmp_var (optype, "PROF");
+  tmp_b = create_tmp_var (optype, "PROF");
+  stmt1 = gimple_build_assign (tmp_k1, fold_convert (optype, value));
+  /* Get the value from the call.  */
+  stmt2 = gimple_build_assign (tmp_b, gimple_call_arg (stmt, 0));
+  stmt3 = gimple_build_cond (NE_EXPR, tmp_b, tmp_k1, NULL_TREE, NULL_TREE);
+  gsi_insert_before (&gsi, stmt1, GSI_SAME_STMT);
+  gsi_insert_before (&gsi, stmt2, GSI_SAME_STMT);
+  gsi_insert_before (&gsi, stmt3, GSI_SAME_STMT);
+  bb1end = stmt3;
+  /* a = k_2  */
+  tmp_a = gimple_get_lhs (stmt);
+  stmt1 = gimple_build_assign (tmp_a, new_value_expr);
+  gsi_insert_before (&gsi, stmt1, GSI_SAME_STMT);
+  bb2end = stmt1;
+  bb3end = stmt;
+  /* Fix CFG. */
+  /* Edge e23 connects bb2 to bb3, etc. */
+  e12 = split_block (bb, bb1end);
+  bb2 = e12->dest;
+  bb2->count = count;
+  e23 = split_block (bb2, bb2end);
+  bb3 = e23->dest;
+  bb3->count = all - count;
+  e34 = split_block (bb3, bb3end);
+  bb4 = e34->dest;
+  bb4->count = all;
+
+  e12->flags &= ~EDGE_FALLTHRU;
+  e12->flags |= EDGE_FALSE_VALUE;
+  e12->probability = prob;
+  e12->count = count;
+  e13 = make_edge (bb, bb3, EDGE_TRUE_VALUE);
+  e13->probability = REG_BR_PROB_BASE - prob;
+  e13->count = all - count;
+
+  remove_edge (e23);
+
+  e24 = make_edge (bb2, bb4, EDGE_FALLTHRU);
+  e24->probability = REG_BR_PROB_BASE;
+  e24->count = count;
+  e34->probability = REG_BR_PROB_BASE;
+  e34->count = all - count;
+
+  return value;
+}
+
+/* Return a REAL_VALUE from gcov_type representing a double.  */
+static REAL_VALUE_TYPE
+gen_real_from_gcov_type (gcov_type g)
+{
+  int len = 8;
+  unsigned char ptr[8];
+  REAL_VALUE_TYPE r;
+  int i;
+  for (i = 0; i < 8; ++i)
+    {
+      ptr[i] = g & 0xff;
+      g = g >> 8;
+    }
+  if (!real_from_native (double_type_node, ptr, len, &r))
+    warning (0, "Error converting value to real.");
+
+  return r;
+}
+
+static tree
+gimple_float_pow_call (gimple stmt, double arg2, int prob, gcov_type count,
+                       gcov_type all)
+{
+  tree tree_arg2;
+  REAL_VALUE_TYPE r;
+
+  r = gen_real_from_gcov_type (gcov_float_to_type (arg2));
+
+  tree_arg2 = build_real (get_gcov_float_t (), r);
+
+  if (arg2 == 0.0 || arg2 == 1.0 || arg2 == 2.0) {
+    /* convert:
+         a = pow(x,y)
+       to:
+         if (y == 0.0 | 1.0 | 2.0): // bb1
+           a = 1.0 | x | x*x        // bb2
+         else
+           a = pow(x,y)             // bb3
+                                    // bb4
+   */
+    gimple stmt1, stmt2, stmt3;
+    tree tmp_b, tmp_a, tmp_k1;
+    gimple bb1end, bb2end, bb3end;
+    basic_block bb, bb2, bb3, bb4;
+    tree optype;
+    edge e12, e13, e23, e24, e34;
+    gimple_stmt_iterator gsi;
+
+
+    gcc_assert (is_gimple_call (stmt));
+
+    optype = TREE_TYPE (gimple_assign_lhs (stmt)); /*double variable */
+    bb = gimple_bb (stmt);
+    gsi = gsi_for_stmt (stmt);
+
+    tmp_k1 = create_tmp_var (optype, "PROF");
+    tmp_b = create_tmp_var (optype, "PROF");
+    stmt1 = gimple_build_assign (tmp_k1, fold_convert (optype, tree_arg2));
+    /*get the value from the call */
+    stmt2 = gimple_build_assign (tmp_b, gimple_call_arg (stmt, 1));
+    stmt3 = gimple_build_cond (NE_EXPR, tmp_b, tmp_k1, NULL_TREE, NULL_TREE);
+    gsi_insert_before (&gsi, stmt1, GSI_SAME_STMT);
+    gsi_insert_before (&gsi, stmt2, GSI_SAME_STMT);
+    gsi_insert_before (&gsi, stmt3, GSI_SAME_STMT);
+    bb1end = stmt3;
+
+    /* a = 1.0  */
+    tmp_a = gimple_get_lhs (stmt);
+    if (arg2 == 0.0) {
+      tree tree_one;
+      r = gen_real_from_gcov_type (gcov_float_to_type (1.0));
+      tree_one = build_real (get_gcov_float_t (), r);
+      stmt1 = gimple_build_assign (tmp_a, tree_one);
+    } else if (arg2 == 1.0) {
+      /* pow (x, 1.0) => x */
+      tree tree_x = gimple_call_arg (stmt, 0);
+      stmt1 = gimple_build_assign (tmp_a, tree_x);
+    } else if (arg2 == 2.0) {
+      /* pow (x, 2.0) => x*x */
+      tree tree_x = gimple_call_arg (stmt, 0);
+      stmt1 = gimple_build_assign_with_ops (MULT_EXPR, tmp_a, tree_x, tree_x);
+    } else {
+      gcc_unreachable ();
+    }
+
+    gsi_insert_before (&gsi, stmt1, GSI_SAME_STMT);
+    bb2end = stmt1;
+    bb3end = stmt;
+
+    /* Fix CFG.  */
+    /* Edge e23 connects bb2 to bb3, etc.  */
+    e12 = split_block (bb, bb1end);
+    bb2 = e12->dest;
+    bb2->count = count;
+    e23 = split_block (bb2, bb2end);
+    bb3 = e23->dest;
+    bb3->count = all - count;
+    e34 = split_block (bb3, bb3end);
+    bb4 = e34->dest;
+    bb4->count = all;
+
+    e12->flags &= ~EDGE_FALLTHRU;
+    e12->flags |= EDGE_FALSE_VALUE;
+    e12->probability = prob;
+    e12->count = count;
+
+    e13 = make_edge (bb, bb3, EDGE_TRUE_VALUE);
+    e13->probability = REG_BR_PROB_BASE - prob;
+    e13->count = all - count;
+
+    remove_edge (e23);
+
+    e24 = make_edge (bb2, bb4, EDGE_FALLTHRU);
+    e24->probability = REG_BR_PROB_BASE;
+    e24->count = count;
+
+    e34->probability = REG_BR_PROB_BASE;
+    e34->count = all - count;
+  }
+
+  return tree_arg2;
 }
 
 
@@ -792,6 +1074,270 @@ gimple_divmod_fixed_value_transform (gimple_stmt_iterator *si)
 
   gimple_assign_set_rhs_from_tree (si, result);
 
+  return true;
+}
+
+enum ffvpt_math_functions
+{
+  FFVPT_EXP_FUN,
+  FFVPT_LOG_FUN,
+  FFVPT_POW_FUN,
+  FFVPT_SQRT_FUN,
+  FFVPT_AMD_EXP_FUN,
+  FFVPT_AMD_LOG_FUN,
+  FFVPT_AMD_POW_FUN,
+  FFVPT_AMD_SQRT_FUN,
+  FFVPT_UNSUPPORTED_FUN
+};
+
+/* Return info if call is a math function that can be optimized by ffvpt.  */
+static enum ffvpt_math_functions
+get_ffvpt_math_function (gimple call, tree fndecl)
+{
+  tree id;
+  int id_len;
+  if (fndecl && DECL_NAME (fndecl) && TREE_PUBLIC (fndecl))
+    {
+      id = DECL_ASSEMBLER_NAME (fndecl);
+      id_len = IDENTIFIER_LENGTH (id);
+      if (id_len == 7 || id_len == 8 || id_len == 9)
+        {
+          const char *name = IDENTIFIER_POINTER (id);
+          /* Validate name and type of functions.  */
+          if (name[0] == 'a')
+            {
+              if (! strcmp (name, "amd_exp") || ! strcmp (name, "acml_exp"))
+                {
+                  if (validate_gimple_arglist (call, REAL_TYPE, VOID_TYPE))
+                    return FFVPT_AMD_EXP_FUN;
+                }
+              else if (! strcmp (name, "amd_pow") || ! strcmp (name, "acml_pow"))
+                {
+                 if (validate_gimple_arglist (call, REAL_TYPE, REAL_TYPE,
+                                              VOID_TYPE))
+                   return FFVPT_AMD_POW_FUN;
+                }
+              else if (! strcmp (name, "amd_log") || ! strcmp (name, "acml_log"))
+                {
+                  if (validate_gimple_arglist (call, REAL_TYPE, VOID_TYPE))
+                    return FFVPT_AMD_LOG_FUN;
+                }
+              else if (! strcmp (name, "amd_sqrt")
+                       || ! strcmp (name, "acml_sqrt"))
+                {
+                  if (validate_gimple_arglist (call, REAL_TYPE, VOID_TYPE))
+                    return FFVPT_AMD_SQRT_FUN;
+                }
+            }
+        }
+    }
+
+  if (!DECL_BUILT_IN (fndecl)
+      || (DECL_BUILT_IN_CLASS (fndecl) != BUILT_IN_NORMAL))
+    return FFVPT_UNSUPPORTED_FUN;
+
+  switch (DECL_FUNCTION_CODE (fndecl))
+    {
+      CASE_FLT_FN (BUILT_IN_EXP):
+          return FFVPT_EXP_FUN;
+      CASE_FLT_FN (BUILT_IN_LOG):
+          return FFVPT_LOG_FUN;
+      CASE_FLT_FN (BUILT_IN_SQRT):
+          return FFVPT_SQRT_FUN;
+      CASE_FLT_FN (BUILT_IN_POW):
+          return FFVPT_POW_FUN;
+    }
+  return FFVPT_UNSUPPORTED_FUN;
+}
+
+
+static bool
+gimple_float_math_call_transform (gimple_stmt_iterator *si)
+{
+  histogram_value histogram;
+  gcov_type val, count, all;
+  gcov_float_t val_f;
+  tree value;
+  tree result;
+
+  gcov_type prob;
+  gimple stmt;
+  tree fndecl;
+  tree arg1;
+
+  double cal_result;
+
+  int bln_precalculate = 0;
+
+  REAL_VALUE_TYPE r;
+
+  enum ffvpt_math_functions math_fun;
+
+  stmt = gsi_stmt (*si);
+  if (gimple_code (stmt) != GIMPLE_CALL)
+    return false;
+
+  fndecl = gimple_call_fndecl (stmt);
+  if (fndecl == NULL)
+    return false;
+
+  math_fun = get_ffvpt_math_function (stmt, fndecl);
+  switch (math_fun)
+    {
+      case FFVPT_UNSUPPORTED_FUN:
+        /* Not a (supported) math function */
+        break;
+      case FFVPT_EXP_FUN:
+      case FFVPT_AMD_EXP_FUN:
+        if (!ffvpt_options.exp_set)
+          return false;
+        arg1 = gimple_call_arg (stmt, 0);
+        break;
+      case FFVPT_LOG_FUN:
+      case FFVPT_AMD_LOG_FUN:
+        if (!ffvpt_options.log_set)
+          return false;
+        arg1 = gimple_call_arg (stmt, 0);
+        break;
+      case FFVPT_POW_FUN:
+      case FFVPT_AMD_POW_FUN:
+        /* Profile the second argument */
+        if (!ffvpt_options.pow_set)
+          return false;
+        arg1 = gimple_call_arg (stmt, 1);
+        break;
+      case FFVPT_SQRT_FUN:
+      case FFVPT_AMD_SQRT_FUN:
+        if (!ffvpt_options.sqrt_set)
+          return false;
+        arg1 = gimple_call_arg (stmt, 0);
+        break;
+      default:
+        gcc_unreachable ();
+    }
+
+  histogram = gimple_histogram_value_of_type (cfun, stmt,
+					      HIST_TYPE_SINGLE_FLOAT_VALUE);
+  if (!histogram)
+    return false;
+
+  value = histogram->hvalue.value;
+  val = histogram->hvalue.counters[0];
+  val_f = gcov_type_to_float (val);
+
+  count = histogram->hvalue.counters[1];
+  all = histogram->hvalue.counters[2];
+  gimple_remove_histogram_value (cfun, stmt, histogram);
+
+  /* We require that count is at least half of all; this means
+     that for the transformation to fire the value must be constant
+     at least 50% of time (and 75% gives the guarantee of usage).  */
+  if (all == 0 || 2 * count < all) {
+    if (dump_file)
+      {
+        fprintf (dump_file, "Not enough count: %ld all: %ld\n", count, all);
+      }
+    return false;
+  }
+
+  if (check_counter (stmt, "value", &count, &all, gimple_bb (stmt)->count)) {
+    if (dump_file)
+      {
+        fprintf (dump_file, "check counter failed\n");
+      }
+    return false;
+  }
+
+  /* Compute probability of taking the optimal path.  */
+  prob = (count * REG_BR_PROB_BASE + all / 2) / all;
+
+  switch (math_fun)
+    {
+      case FFVPT_EXP_FUN:
+      case FFVPT_AMD_EXP_FUN:
+        cal_result = exp (val_f);
+        bln_precalculate = 1;
+        break;
+      case FFVPT_LOG_FUN:
+      case FFVPT_AMD_LOG_FUN:
+        cal_result = log (val_f);
+        bln_precalculate = 1;
+        break;
+      case FFVPT_SQRT_FUN:
+      case FFVPT_AMD_SQRT_FUN:
+        cal_result = sqrt (val_f);
+        bln_precalculate = 1;
+        break;
+      case FFVPT_POW_FUN:
+      case FFVPT_AMD_POW_FUN:
+        bln_precalculate = 0;
+        break;
+      default:
+        /* Unsupported math function found. */
+        gcc_unreachable ();
+    }
+  if (bln_precalculate)
+    {
+      tree tree_val;
+      tree cal_tree;
+      r = gen_real_from_gcov_type (val);
+      tree_val = build_real (get_gcov_float_t (), r);
+      r = gen_real_from_gcov_type (gcov_float_to_type (cal_result));
+      cal_tree = build_real (get_gcov_float_t (), r);
+
+      result = gimple_ffvpt_update_math_calls (stmt, tree_val, prob, count, all,
+                                               cal_tree);
+    }
+  else if (bln_precalculate == 0)
+    {
+      /* Calls pow with second argument almost always a constant...*/
+      /* tree tree_arg_1; */
+      if (val_f == 0.0)
+        {
+          /* Replace with 1.00! */
+          result = gimple_float_pow_call (stmt, val_f, prob, count, all);
+        }
+      else if (val_f == 1.0)
+        {
+          /* Replace with first argument */
+          result = gimple_float_pow_call (stmt, val_f, prob, count, all);
+        }
+      else if (val_f == 2.0)
+        {
+          /* Replace with first argument times itself */
+          result = gimple_float_pow_call (stmt, val_f, prob, count, all);
+        }
+      else
+        {
+          /* TODO(martint): Consider optimizing other constants as well.
+             For example 0.5 -> sqrt() */
+          return false;
+        }
+
+    }
+  if (dump_file)
+    {
+      if (bln_precalculate) {
+        fprintf (dump_file,
+                 "Math call (%s) to constant value: %f in %s (use %f) "
+                 "(count:%ld, all:%ld)\n",
+                 lang_hooks.decl_printable_name (fndecl, 1),
+                 val_f,
+                 current_function_name (),
+                 cal_result,
+                 count,
+                 all);
+      } else {
+        fprintf (dump_file,
+                 "Math call (%s) with constant argument (%f) optimized in %s: "
+                 "(count:%ld, all:%ld)\n",
+                 lang_hooks.decl_printable_name (fndecl, 1),
+                 val_f,
+                 current_function_name (),
+                 count,
+                 all);
+      }
+    }
   return true;
 }
 
@@ -1173,6 +1719,18 @@ find_func_by_pid (int pid)
 }
 
 
+/* Remove a cgraph node from the map of pids */
+
+void
+cgraph_remove_pid (struct cgraph_node *n)
+{
+  if (pid_map == NULL || n->pid < 0)
+    return;
+
+  pid_map [n->pid] = NULL;
+}
+
+
 /* Initialize map of gids (gid -> cgraph node) */
 
 static htab_t gid_map = NULL;
@@ -1283,50 +1841,79 @@ find_func_by_global_id (unsigned HOST_WIDE_INT gid)
    in the profile.
    TODO: need to transform this lookup method to hash table.  */
 
-static struct cgraph_node *
-find_func_by_name (char *name)
+struct cgraph_node *
+find_func_by_name (const char *name)
 {
-  struct cgraph_node *n;
-  struct cgraph_node *ret = NULL;
-  int match = 0;
+  struct cgraph_node *node = NULL;
+  int len = strlen (name);
 
-  for (n = cgraph_nodes; n; n = n->next)
-    {
-      const char *fname = IDENTIFIER_POINTER (decl_assembler_name (n->decl));
-      if (!strcmp(fname, name)) {
-        match ++;
-        ret = n;
-      }
-    }
-  if (match == 1)
-    return ret;
-  else
-    return NULL;
+  for (node = cgraph_nodes; node; node = node->next) {
+    const char *fname = IDENTIFIER_POINTER (decl_assembler_name (node->decl));
+    if (!node->global.inlined_to
+        && node->analyzed
+        && node->master_clone == node
+        && !strncmp(fname, name, len)
+        && (!strncmp(fname + len, "_cmo_", 5) || fname[len] == 0
+            || fname[len] == '.'))
+      break;
+  }
+  return node;
+}
+
+/* Counts the number of arguments in the function_decl FN_DECL.
+
+   Returns the number of arguments.  */
+static unsigned
+function_decl_num_args (tree fn_decl)
+{
+  tree arg;
+  unsigned count = 0;
+  for (arg = DECL_ARGUMENTS (fn_decl); arg; arg = TREE_CHAIN (arg))
+    count++;
+  return count;
 }
 
 /* Perform sanity check on the indirect call target. Due to race conditions,
    false function target may be attributed to an indirect call site. If the
    call expression type mismatches with the target function's type, expand_call
    may ICE. Here we only do very minimal sanity check just to make compiler happy.
-   Returns true if TARGET is considered ok for call CALL_EXPR.  */
+   Returns true if TARGET is considered ok for call CALL_STMT.  */
 
 static bool
-check_ic_target (tree call_expr, struct cgraph_node *target)
+check_ic_target (gimple call_stmt, struct cgraph_node *target)
 {
   tree tgt_decl;
   /* Return types.  */
   tree icall_type, tgt_type; 
+  tree call_expr;
 
   tgt_decl = target->decl;
   tgt_type = TREE_TYPE (TREE_TYPE (tgt_decl));
 
+  call_expr = gimple_call_fn (call_stmt);
   icall_type = TREE_TYPE (call_expr);
   if (POINTER_TYPE_P (icall_type))
     icall_type = TREE_TYPE (icall_type);
   icall_type = TREE_TYPE (icall_type);
 
-  return (TREE_CODE (icall_type) == TREE_CODE (tgt_type)
-          && TYPE_MODE (icall_type) == TYPE_MODE (tgt_type));
+  if (TREE_CODE (icall_type) != TREE_CODE (tgt_type)
+      || TYPE_MODE (icall_type) != TYPE_MODE (tgt_type))
+    return false;
+
+  /* Verify that CALL_STMT has the same number of arguments as TGT_TYPE. */
+  if (gimple_call_num_args (call_stmt) != function_decl_num_args (tgt_decl))
+    return false;
+
+  /* Record types should have matching sizes. */
+  if (TREE_CODE (icall_type) == RECORD_TYPE
+      && TYPE_SIZE (icall_type) != NULL_TREE
+      && TYPE_SIZE (tgt_type) != NULL_TREE
+      && TREE_CODE (TYPE_SIZE (icall_type)) == INTEGER_CST
+      && (TREE_CODE (TYPE_SIZE (tgt_type)) != INTEGER_CST ||
+	  !tree_int_cst_equal (TYPE_SIZE (icall_type), TYPE_SIZE (tgt_type))))
+    return false;
+
+  return true;
 }
 
 /* Do transformation
@@ -1460,7 +2047,7 @@ gimple_ic_transform_single_targ (gimple stmt, histogram_value histogram)
   if (direct_call == NULL)
     return false;
 
-  if (!check_ic_target (gimple_call_fn (stmt), direct_call))
+  if (!check_ic_target (stmt, direct_call))
     return false;
 
   modify = gimple_ic (stmt, stmt, direct_call, prob, count, all);
@@ -1567,7 +2154,7 @@ gimple_ic_transform_mult_targ (gimple stmt, histogram_value histogram)
   locus = (stmt != NULL) ? gimple_location (stmt)
       : DECL_SOURCE_LOCATION (current_function_decl);
   if (direct_call1 == NULL
-      || !check_ic_target (gimple_call_fn (stmt), direct_call1))
+      || !check_ic_target (stmt, direct_call1))
     {
       if (flag_ripa_verbose)
         {
@@ -1635,7 +2222,7 @@ gimple_ic_transform_mult_targ (gimple stmt, histogram_value histogram)
 	       " hist->all "HOST_WIDEST_INT_PRINT_DEC"\n", count1, all);
     }
 
-  if (direct_call2 && check_ic_target (gimple_call_fn (stmt), direct_call2)
+  if (direct_call2 && check_ic_target (stmt, direct_call2)
       /* Don't indirect-call promote if the target is in auxiliary module and
 	 DECL_ARTIFICIAL and not TREE_PUBLIC, because we don't static-promote
 	 DECL_ARTIFICIALs yet.  */
@@ -1730,6 +2317,14 @@ static bool
 interesting_stringop_to_profile_p (tree fndecl, gimple call, int *size_arg)
 {
   enum built_in_function fcode = DECL_FUNCTION_CODE (fndecl);
+
+  /* XXX: Disable stringop collection with reuse distance instrumentation
+     or optimization.  Otherwise we end up with hard to correct profile
+     mismatches for functions where reuse distance-based transformation are
+     made.  We see a number of "memcpy" at instrumentation time and a different
+     number of "memcpy" at profile use time.  */
+  if (flag_profile_reusedist || flag_optimize_locality)
+    return false;
 
   if (fcode != BUILT_IN_MEMCPY && fcode != BUILT_IN_MEMPCPY
       && fcode != BUILT_IN_MEMSET && fcode != BUILT_IN_BZERO)
@@ -1989,6 +2584,50 @@ stringop_block_profile (gimple stmt, unsigned int *expected_align,
       gimple_remove_histogram_value (cfun, stmt, histogram);
     }
 }
+
+
+
+/* Find log,exp,pow,squrt calls and profile arguments.  */
+static void
+gimple_math_call_to_profile (gimple stmt, histogram_values *values)
+{
+  /*   histogram_value hist; */
+  tree fndecl;
+  tree arg1;
+  enum ffvpt_math_functions math_fun;
+
+  if (gimple_code (stmt) != GIMPLE_CALL)
+    return;
+
+  /* Hopefully the math function */
+  fndecl = gimple_call_fndecl (stmt);
+  if (fndecl == NULL)
+    return;
+
+  /* Look for amd_exp, amd_log, amd_pow*/
+  math_fun = get_ffvpt_math_function (stmt, fndecl);
+  if (math_fun != FFVPT_UNSUPPORTED_FUN)
+    {
+      if (math_fun == FFVPT_POW_FUN || math_fun == FFVPT_AMD_POW_FUN)
+        arg1 = gimple_call_arg (stmt, 1);
+      else
+        arg1 = gimple_call_arg (stmt, 0);
+      if (dump_file)
+        {
+          fprintf (dump_file, "Add profiling for call to %s in %s\n",
+                   lang_hooks.decl_printable_name (fndecl, 1),
+                   current_function_name ());
+        }
+      VEC_reserve (histogram_value, heap, *values, 3);
+      VEC_quick_push (histogram_value, *values,
+                      gimple_alloc_histogram_value (cfun,
+                                                    HIST_TYPE_SINGLE_FLOAT_VALUE,
+                                                    stmt, arg1));
+    }
+  return;
+}
+
+
 
 struct value_prof_hooks {
   /* Find list of values for which we want to measure histograms.  */
@@ -2298,6 +2937,8 @@ gimple_values_to_profile (gimple stmt, histogram_values *values)
       gimple_divmod_values_to_profile (stmt, values);
       gimple_stringops_values_to_profile (stmt, values);
       gimple_indirect_call_to_profile (stmt, values);
+      if (flag_float_value_profile_transformations)
+        gimple_math_call_to_profile (stmt, values);
     }
 }
 
@@ -2313,7 +2954,7 @@ gimple_find_values_to_profile (histogram_values *values)
   FOR_EACH_BB (bb)
     for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
       gimple_values_to_profile (gsi_stmt (gsi), values);
-  
+
   for (i = 0; VEC_iterate (histogram_value, *values, i, hist); i++)
     {
       switch (hist->type)
@@ -2327,6 +2968,10 @@ gimple_find_values_to_profile (histogram_values *values)
 	  break;
 
 	case HIST_TYPE_SINGLE_VALUE:
+	  hist->n_counters = 3;
+	  break;
+
+	case HIST_TYPE_SINGLE_FLOAT_VALUE:
 	  hist->n_counters = 3;
 	  break;
 

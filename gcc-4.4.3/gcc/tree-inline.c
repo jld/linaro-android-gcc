@@ -1853,6 +1853,7 @@ initialize_cfun (tree new_fndecl, tree callee_fndecl, gcov_type count,
   cfun->returns_struct = src_cfun->returns_struct;
   cfun->returns_pcc_struct = src_cfun->returns_pcc_struct;
   cfun->after_tree_profile = src_cfun->after_tree_profile;
+  cfun->language = src_cfun->language;
 
   init_empty_tree_cfg ();
 
@@ -3304,8 +3305,9 @@ expand_call_inline (basic_block bb, gimple stmt, copy_body_data *id)
 	  /* Avoid warnings during early inline pass. */
 	  && cgraph_global_info_ready)
 	{
-	  sorry ("inlining failed in call to %q+F: %s", fn, reason);
-	  sorry ("called from here");
+	  error ("%q+F has attribute 'always_inline', but was not inlined."
+		 "  Reason: %s", fn, reason);
+	  error ("called from here");
 	}
       else if (warn_inline && DECL_DECLARED_INLINE_P (fn)
 	       && !DECL_IN_SYSTEM_HEADER (fn)

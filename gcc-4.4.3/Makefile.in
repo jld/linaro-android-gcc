@@ -305,9 +305,17 @@ WINDRES_FOR_BUILD = @WINDRES_FOR_BUILD@
 BUILD_PREFIX = @BUILD_PREFIX@
 BUILD_PREFIX_1 = @BUILD_PREFIX_1@
 
+# Some stuff don't compile with SSP
+enable_esp = @enable_esp@
+ifeq ($(enable_esp),yes)
+ESP_NOSSP_CFLAGS = -fno-stack-protector
+else
+ESP_NOSSP_CFLAGS=
+endif
+
 # Flags to pass to stage2 and later makes.  They are defined
 # here so that they can be overridden by Makefile fragments.
-BOOT_CFLAGS= -g -O2
+BOOT_CFLAGS= -g -O2 $(ESP_NOSSP_CFLAGS)
 BOOT_LDFLAGS=
 BOOT_ADAFLAGS=-gnatpg -gnata
 
@@ -350,9 +358,9 @@ GNATMAKE = @GNATMAKE@
 
 CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
-LIBCFLAGS = $(CFLAGS)
+LIBCFLAGS = $(CFLAGS) $(ESP_NOSSP_CFLAGS)
 CXXFLAGS = @CXXFLAGS@
-LIBCXXFLAGS = $(CXXFLAGS) -fno-implicit-templates
+LIBCXXFLAGS = $(CXXFLAGS) -fno-implicit-templates $(ESP_NOSSP_CFLAGS)
 
 TFLAGS =
 

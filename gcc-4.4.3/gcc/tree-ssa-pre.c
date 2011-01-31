@@ -3967,6 +3967,7 @@ eliminate (void)
 		      print_gimple_stmt (dump_file, stmt, 0, 0);
 		    }
 
+                  fixup_vdef_ssa_val_refs (stmt);
 		  /* Propagate all may-uses to the uses of their defs.  */
 		  FOR_EACH_SSA_VDEF_OPERAND (def, usevec, stmt, oi)
 		    {

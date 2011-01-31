@@ -555,6 +555,9 @@ objext = .o
 exeext = @host_exeext@
 build_exeext = @build_exeext@
 
+# Google-local http://b/2739909
+link_rpath_spec = @link_rpath_spec@
+
 # Directory in which to put man pages.
 mandir = @mandir@
 man1dir = $(mandir)/man1
@@ -593,13 +596,24 @@ ifeq ($(inhibit_libc),true)
 INHIBIT_LIBC_CFLAGS = -Dinhibit_libc
 endif
 
+# We don't want __stack_chk_fail in crt* and libgcc2.a.
+# We don't want to compile crtbegin, crtend and crtbeginT with -fPIE.
+enable_esp = @enable_esp@
+ifeq ($(enable_esp),yes)
+ESP_NOPIE_CFLAGS = -fno-PIE
+ESP_NOSSP_CFLAGS = -fno-stack-protector
+else
+ESP_NOPIE_CFLAGS=
+ESP_NOSSP_CFLAGS=
+endif
+
 # Options to use when compiling libgcc2.a.
 #
 LIBGCC2_DEBUG_CFLAGS = -g
 LIBGCC2_CFLAGS = -O2 $(LIBGCC2_INCLUDES) $(GCC_CFLAGS) $(TARGET_LIBGCC2_CFLAGS) \
 		 $(LIBGCC2_DEBUG_CFLAGS) $(GTHREAD_FLAGS) \
 		 -DIN_LIBGCC2 -D__GCC_FLOAT_NOT_NEEDED \
-		 $(INHIBIT_LIBC_CFLAGS)
+		 $(INHIBIT_LIBC_CFLAGS) $(ESP_NOSSP_CFLAGS)
 
 # Additional options to use when compiling libgcc2.a.
 # Some targets override this to -isystem include
@@ -610,9 +624,9 @@ TARGET_LIBGCC2_CFLAGS =
 
 # Options to use when compiling crtbegin/end.
 CRTSTUFF_CFLAGS = -O2 $(GCC_CFLAGS) $(INCLUDES) $(MULTILIB_CFLAGS) -g0 \
-  -finhibit-size-directive -fno-inline-functions -fno-exceptions \
+  -finhibit-size-directive -fno-inline -fno-exceptions \
   -fno-zero-initialized-in-bss -fno-toplevel-reorder -fno-tree-vectorize \
-  $(INHIBIT_LIBC_CFLAGS)
+  $(INHIBIT_LIBC_CFLAGS) $(ESP_NOSSP_CFLAGS)
 
 # Additional sources to handle exceptions; overridden by targets as needed.
 LIB2ADDEH = $(srcdir)/unwind-dw2.c $(srcdir)/unwind-dw2-fde.c \
@@ -641,6 +655,12 @@ EXTRA_PROGRAMS = @extra_programs@
 # List of extra object files that should be compiled for this target machine.
 # The rules for compiling them should be in the t-* file for the machine.
 EXTRA_PARTS = @extra_parts@
+
+# We add crtbeginTS.o to the EXTRA_PARTS list if enable_crtbeginTS = yes
+enable_crtbeginTS = @enable_crtbeginTS@
+ifeq ($(enable_crtbeginTS),yes)
+EXTRA_PARTS += crtbeginTS.o
+endif
 
 # List of extra object files that should be compiled and linked with
 # compiler proper (cc1, cc1obj, cc1plus).
@@ -930,7 +950,7 @@ BUILD_LIBDEPS= $(BUILD_LIBIBERTY)
 # How to link with both our special library facilities
 # and the system's installed libraries.
 LIBS = @LIBS@ $(CPPLIB) $(LIBINTL) $(LIBICONV) $(LIBIBERTY) $(LIBDECNUMBER)
-BACKENDLIBS = $(CLOOGLIBS) $(PPLLIBS) $(GMPLIBS) $(PLUGINLIBS)
+BACKENDLIBS = $(CLOOGLIBS) $(PPLLIBS) $(GMPLIBS) $(PLUGINLIBS) -lm
 # Any system libraries needed just for GNAT.
 SYSLIBS = @GNAT_LIBEXC@
 
@@ -1166,6 +1186,7 @@ OBJS-common = \
 	mcf.o \
 	mode-switching.o \
 	modulo-sched.o \
+	mversn-dispatch.o \
 	omega.o \
 	omp-low.o \
 	optabs.o \
@@ -1212,6 +1233,7 @@ OBJS-common = \
 	simplify-rtx.o \
 	sparseset.o \
 	sreal.o \
+	tree-stack-overlay.o \
 	stack-ptr-mod.o \
 	statistics.o \
 	stmt.o \
@@ -1368,13 +1390,14 @@ MOSTLYCLEANFILES = insn-flags.h insn-config.h insn-codes.h \
 LIB2FUNCS_ST = _eprintf __gcc_bcmp
 
 # Defined in libgcov.c, included only in gcov library
-LIBGCOV = _gcov _gcov_merge_add _gcov_merge_single _gcov_merge_delta \
-    _gcov_fork _gcov_execl _gcov_execlp _gcov_execle \
+LIBGCOV = _gcov _gcov_merge_add _gcov_merge_single _gcov_merge_single_float \
+    _gcov_merge_delta _gcov_fork _gcov_execl _gcov_execlp _gcov_execle \
     _gcov_execv _gcov_execvp _gcov_execve \
     _gcov_interval_profiler _gcov_pow2_profiler _gcov_one_value_profiler \
-    _gcov_indirect_call_profiler _gcov_direct_call_profiler \
-    _gcov_average_profiler _gcov_ior_profiler _gcov_merge_ior _gcov_merge_dc \
-    _gcov_merge_icall_topn _gcov_indirect_call_topn_profiler
+    _gcov_one_float_value_profiler _gcov_indirect_call_profiler \
+    _gcov_direct_call_profiler _gcov_average_profiler _gcov_ior_profiler \
+    _gcov_merge_ior _gcov_merge_dc  _gcov_merge_icall_topn \
+    _gcov_indirect_call_topn_profiler  _gcov_merge_reusedist
 
 FPBIT_FUNCS = _pack_sf _unpack_sf _addsub_sf _mul_sf _div_sf \
     _fpcmp_parts_sf _compare_sf _eq_sf _ne_sf _gt_sf _ge_sf \
@@ -1743,8 +1766,9 @@ libgcc.mvars: config.status Makefile $(LIB2ADD) $(LIB2ADD_ST) specs \
 	echo LIBGCC_SYNC = '$(LIBGCC_SYNC)' >> tmp-libgcc.mvars
 	echo LIBGCC_SYNC_CFLAGS = '$(LIBGCC_SYNC_CFLAGS)' >> tmp-libgcc.mvars
 	echo CRTSTUFF_CFLAGS = '$(CRTSTUFF_CFLAGS)' >> tmp-libgcc.mvars
-	echo CRTSTUFF_T_CFLAGS = '$(CRTSTUFF_T_CFLAGS)' >> tmp-libgcc.mvars
+	echo CRTSTUFF_T_CFLAGS = '$(CRTSTUFF_T_CFLAGS) $(ESP_NOPIE_CFLAGS)' >> tmp-libgcc.mvars
 	echo CRTSTUFF_T_CFLAGS_S = '$(CRTSTUFF_T_CFLAGS_S)' >> tmp-libgcc.mvars
+	echo enable_crtbeginTS = '$(enable_crtbeginTS)' >> tmp-libgcc.mvars
 
 	mv tmp-libgcc.mvars libgcc.mvars
 
@@ -1778,12 +1802,14 @@ s-mlib: $(srcdir)/genmultilib Makefile
 $(T)crtbegin.o: crtstuff.c $(GCC_PASSES) $(TCONFIG_H) auto-host.h \
   gbl-ctors.h stmp-int-hdrs tsystem.h coretypes.h $(TM_H)
 	$(GCC_FOR_TARGET) $(CRTSTUFF_CFLAGS) $(CRTSTUFF_T_CFLAGS) \
+	$(ESP_NOPIE_CFLAGS) \
 	  -c $(srcdir)/crtstuff.c -DCRT_BEGIN \
 	  -o $(T)crtbegin$(objext)
 
 $(T)crtend.o: crtstuff.c $(GCC_PASSES) $(TCONFIG_H) auto-host.h \
   gbl-ctors.h stmp-int-hdrs tsystem.h coretypes.h $(TM_H)
 	$(GCC_FOR_TARGET) $(CRTSTUFF_CFLAGS) $(CRTSTUFF_T_CFLAGS) \
+	$(ESP_NOPIE_CFLAGS) \
 	  -c $(srcdir)/crtstuff.c -DCRT_END \
 	  -o $(T)crtend$(objext)
 
@@ -1804,8 +1830,18 @@ $(T)crtendS.o: crtstuff.c $(GCC_PASSES) $(TCONFIG_H) auto-host.h \
 $(T)crtbeginT.o: crtstuff.c $(GCC_PASSES) $(TCONFIG_H) auto-host.h \
   gbl-ctors.h stmp-int-hdrs tsystem.h coretypes.h $(TM_H)
 	$(GCC_FOR_TARGET) $(CRTSTUFF_CFLAGS) $(CRTSTUFF_T_CFLAGS) \
+	$(ESP_NOPIE_CFLAGS) \
 	  -c $(srcdir)/crtstuff.c -DCRT_BEGIN -DCRTSTUFFT_O \
 	  -o $(T)crtbeginT$(objext)
+
+# This is a version of crtbegin for -static -fPIE links if espf is enable.
+ifeq ($(enable_crtbeginTS),yes)
+$(T)crtbeginTS.o: crtstuff.c $(GCC_PASSES) $(TCONFIG_H) auto-host.h \
+  gbl-ctors.h stmp-int-hdrs tsystem.h coretypes.h $(TM_H)
+	$(GCC_FOR_TARGET) $(CRTSTUFF_CFLAGS) $(CRTSTUFF_T_CFLAGS_S) \
+	  -c $(srcdir)/crtstuff.c -DCRT_BEGIN -DCRTSTUFFT_O -DCRTSTUFFS_O \
+	  -o $(T)crtbeginTS$(objext)
+endif
 
 # Compile the start modules crt0.o and mcrt0.o that are linked with
 # every program
@@ -1924,7 +1960,7 @@ c-opts.o : c-opts.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H)		\
         $(TREE_H) $(C_PRAGMA_H) $(FLAGS_H) $(TOPLEV_H) langhooks.h		\
         $(TREE_INLINE_H) $(DIAGNOSTIC_H) intl.h debug.h $(C_COMMON_H)	\
         opts.h options.h $(MKDEPS_H) incpath.h cppdefault.h $(TARGET_H) \
-	$(TM_P_H) $(VARRAY_H) $(FUNCTION_H)
+	$(TM_P_H) $(VARRAY_H) $(FUNCTION_H) $(PARAMS_H)
 	$(CC) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) \
 		$< $(OUTPUT_OPTION) @TARGET_SYSTEM_ROOT_DEFINE@
 
@@ -1976,6 +2012,7 @@ DRIVER_DEFINES = \
   -DDEFAULT_TARGET_MACHINE=\"$(target_noncanonical)\" \
   -DSTANDARD_BINDIR_PREFIX=\"$(bindir)/\" \
   -DTOOLDIR_BASE_PREFIX=\"$(libsubdir_to_prefix)$(prefix_to_exec_prefix)\" \
+  -DLINK_RPATH_SPEC="\" $(link_rpath_spec) \"" \
   @RUNTIME_ROOT_PREFIX_DEFINE@ \
   @TARGET_SYSTEM_ROOT_DEFINE@ \
   $(VALGRIND_DRIVER_DEFINES) \
@@ -2727,6 +2764,11 @@ implicit-zee.o : implicit-zee.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(RT
    $(DF_H) $(TIMEVAR_H) tree-pass.h $(RECOG_H) $(EXPR_H)  \
    $(REGS_H) $(TREE_H) $(TM_P_H) insn-config.h $(INSN_ATTR_H) $(REAL_H) $(TOPLEV_H) \
    $(TARGET_H) $(OPTABS_H) insn-codes.h rtlhooks-def.h $(PARAMS_H) $(CGRAPH_H)
+mversn-dispatch.o : mversn-dispatch.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) \
+   $(TREE_H) langhooks.h $(TREE_INLINE_H) $(FLAGS_H) $(CGRAPH_H) intl.h \
+   $(DIAGNOSTIC_H) $(FIBHEAP_H) $(PARAMS_H) $(TIMEVAR_H) tree-pass.h \
+   $(HASHTAB_H) $(COVERAGE_H) $(GGC_H) $(TREE_FLOW_H) $(RTL_H) $(IPA_PROP_H) \
+   $(BASIC_BLOCK_H) $(TOPLEV_H) $(TREE_DUMP_H)
 gcse.o : gcse.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(RTL_H) \
    $(REGS_H) hard-reg-set.h $(FLAGS_H) $(REAL_H) insn-config.h $(GGC_H) \
    $(RECOG_H) $(EXPR_H) $(BASIC_BLOCK_H) $(FUNCTION_H) output.h $(TOPLEV_H) \
@@ -2835,7 +2877,7 @@ cfgexpand.o : cfgexpand.c $(TREE_FLOW_H) $(CONFIG_H) $(SYSTEM_H) \
    $(RTL_H) $(TREE_H) $(TM_P_H) $(EXPR_H) $(FUNCTION_H) $(TIMEVAR_H) $(TM_H) \
    coretypes.h $(TREE_DUMP_H) except.h langhooks.h tree-pass.h $(RTL_H) \
    $(DIAGNOSTIC_H) $(TOPLEV_H) $(BASIC_BLOCK_H) $(FLAGS_H) debug.h $(PARAMS_H) \
-   value-prof.h $(TREE_INLINE_H) $(TARGET_H)
+   value-prof.h $(TREE_INLINE_H) $(TARGET_H) tree-stack-overlay.h
 cfgrtl.o : cfgrtl.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(RTL_H) \
    $(FLAGS_H) insn-config.h $(BASIC_BLOCK_H) $(REGS_H) hard-reg-set.h \
    output.h $(TOPLEV_H) $(FUNCTION_H) except.h $(TM_P_H) $(INSN_ATTR_H) \
@@ -2942,6 +2984,11 @@ alias.o : alias.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(RTL_H) \
    $(ALIAS_H) $(EMIT_RTL_H) $(GGC_H) $(FUNCTION_H) cselib.h $(TREE_H) $(TM_P_H) \
    langhooks.h $(TARGET_H) gt-alias.h $(TIMEVAR_H) $(CGRAPH_H) \
    $(SPLAY_TREE_H) $(VARRAY_H) $(IPA_TYPE_ESCAPE_H) $(DF_H) tree-pass.h
+tree-stack-overlay.o : tree-stack-overlay.c $(TREE_FLOW_H) $(CONFIG_H) $(SYSTEM_H) \
+   $(RTL_H) $(TREE_H) $(TM_P_H) $(EXPR_H) $(FUNCTION_H) $(TIMEVAR_H) $(TM_H) \
+   coretypes.h $(TREE_DUMP_H) except.h langhooks.h tree-pass.h $(RTL_H) \
+   $(DIAGNOSTIC_H) $(TOPLEV_H) $(BASIC_BLOCK_H) $(FLAGS_H) debug.h $(PARAMS_H) \
+   $(TARGET_H) tree-stack-overlay.h gt-tree-stack-overlay.h $(GGC_H)
 stack-ptr-mod.o : stack-ptr-mod.c $(CONFIG_H) $(SYSTEM_H) coretypes.h \
    $(TM_H) $(TREE_H) $(RTL_H) $(REGS_H) $(EXPR_H) tree-pass.h \
    $(BASIC_BLOCK_H) $(FLAGS_H) output.h $(DF_H)
@@ -3114,7 +3161,7 @@ $(out_object_file): $(out_file) $(CONFIG_H) coretypes.h $(TM_H) $(TREE_H) \
    output.h $(INSN_ATTR_H) $(SYSTEM_H) $(TOPLEV_H) $(TARGET_H) libfuncs.h \
    $(TARGET_DEF_H) $(FUNCTION_H) $(SCHED_INT_H) $(TM_P_H) $(EXPR_H) \
    langhooks.h $(GGC_H) $(OPTABS_H) $(REAL_H) tm-constrs.h $(GIMPLE_H)
-	$(CC) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) \
+	$(CC) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(ESP_NOSSP_CFLAGS)\
 		$(out_file) $(OUTPUT_OPTION)
 
 # Build auxiliary files that support ecoff format.
@@ -3366,6 +3413,7 @@ GTFILES = $(CPP_ID_DATA_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
   $(srcdir)/tree-phinodes.c \
   $(srcdir)/ipa-reference.c $(srcdir)/tree-ssa-structalias.h \
   $(srcdir)/tree-ssa-structalias.c $(srcdir)/tree-inline.c \
+  $(srcdir)/tree-stack-overlay.c \
   @all_gtfiles@
 
 # Compute the list of GT header files from the corresponding C sources,
@@ -4191,7 +4239,7 @@ PLUGIN_HEADERS = $(TREE_H) $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) \
   $(host_xm_file_list) $(host_xm_include_list) $(xm_include_list) \
   intl.h $(PLUGIN_VERSION_H) $(DIAGNOSTIC_H) $(C_COMMON_H) $(C_PRETTY_PRINT_H) \
   tree-iterator.h $(PLUGIN_H) $(TREE_FLOW_H) langhooks.h incpath.h \
-  tree-ssa-sccvn.h real.h output.h $(IPA_UTILS_H)
+  tree-ssa-sccvn.h real.h output.h $(IPA_UTILS_H) $(CFGLOOP_H)
 
 # Install the headers needed to build a plugin.
 install-plugin: installdirs lang.install-plugin

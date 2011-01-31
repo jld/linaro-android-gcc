@@ -2004,7 +2004,7 @@ expand_call (tree exp, rtx target, int ignore)
 #ifdef REG_PARM_STACK_SPACE
   /* Define the boundary of the register parm stack space that needs to be
      saved, if any.  */
-  int low_to_save, high_to_save;
+  int low_to_save = 0, high_to_save = 0;
   rtx save_area = 0;		/* Place that it is saved */
 #endif
 
@@ -3812,7 +3812,7 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
      cse'ing of library calls could delete a call and leave the pop.  */
   NO_DEFER_POP;
   valreg = (mem_value == 0 && outmode != VOIDmode
-	    ? hard_libcall_value (outmode) : NULL_RTX);
+	    ? hard_libcall_value (outmode, orgfun) : NULL_RTX);
 
   /* Stack must be properly aligned now.  */
   gcc_assert (!(stack_pointer_delta

@@ -5682,7 +5682,7 @@ vrp_evaluate_conditional (enum tree_code code, tree op0, tree op1, gimple stmt)
 {
   bool sop;
   tree ret;
-  bool only_ranges;
+  bool only_ranges = false;
 
   /* Some passes and foldings leak constants with overflow flag set
      into the IL.  Avoid doing wrong things with these and bail out.  */

@@ -27,7 +27,7 @@ class Bar {
 template <class T>
 void func(T t) {
   ::testing::Bar(1) = ::testing::Foo(); // used to trigger a segfault
-  ::testing::Foo() = ::testing::Foo(); // { dg-warning "assigned to itself" }
+  ::testing::Foo() = ::testing::Foo();
 }
 
 main() {

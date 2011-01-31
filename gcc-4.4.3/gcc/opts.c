@@ -45,8 +45,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "plugin.h"
 #include "cgraph.h"
 
+/* Defined in value-prof.c.  */
+extern struct ffvpt_options_s ffvtp_process_options (const char *arg);
+
 /* Defined in ipa-inline.c.  */
 extern bool cgraph_gate_ipa_early_inlining (void);
+
+/* Defined in coverage.c.  */
+extern bool check_pmu_profile_options (const char *options);
 
 /* Value of the -G xx switch, and whether it was passed or not.  */
 unsigned HOST_WIDE_INT g_switch_value;
@@ -354,6 +360,13 @@ static const char undocumented_msg[] = N_("This switch lacks documentation");
 #else
 static const char undocumented_msg[] = "";
 #endif
+
+/* Used for bookkeeping if -Werror/-Wno-error was specified to know
+ * whether to make certain warnings errors by default. */
+static bool flag_werror_set;
+
+/* Options related to floating point value profiling.  */
+struct ffvpt_options_s ffvpt_options;
 
 /* Used for bookkeeping on whether user set these flags so
    -fprofile-use/-fprofile-generate does not use them.  */
@@ -1018,8 +1031,8 @@ decode_options (unsigned int argc, const char **argv)
   else
     set_param_value ("min-crossjump-insns", initial_min_crossjump_insns);
 
-  /* Enable -Werror=coverage-mismatch by default */
-  enable_warning_as_error("coverage-mismatch", 1, lang_mask);
+  /* Enable -Wcoverage-mismatch by default */
+  warn_coverage_mismatch = true;
 
   if (first_time_p)
     {
@@ -1043,6 +1056,18 @@ decode_options (unsigned int argc, const char **argv)
 #endif
 
   handle_options (argc, argv, lang_mask);
+
+  if (!flag_werror_set)
+    {
+      /* Enable -Werror=coverage-mismatch by default, if it hasn't
+       * been set explicitly */
+      if (warn_coverage_mismatch
+          && (global_dc->classify_diagnostic[OPT_Wcoverage_mismatch] ==
+              DK_UNSPECIFIED))
+        {
+          enable_warning_as_error("coverage-mismatch", 1, lang_mask);
+        }
+    }
 
   /* If -gmlt was specified, make sure debug level is at least 1.  */
   if (generate_debug_line_table && debug_info_level < DINFO_LEVEL_TERSE)
@@ -1104,6 +1129,7 @@ decode_options (unsigned int argc, const char **argv)
 	flag_pic = flag_pie;
       if (flag_pic && !flag_pie)
 	flag_shlib = 1;
+      first_time_p = false;
     }
 
   if (optimize == 0)
@@ -1183,13 +1209,6 @@ decode_options (unsigned int argc, const char **argv)
       warn_thread_safety = 0;
     }
 
-  /* Save the current optimization options if this is the first call.  */
-  if (first_time_p)
-    {
-      optimization_default_node = build_optimization_node ();
-      optimization_current_node = optimization_default_node;
-      first_time_p = false;
-    }
   if (flag_conserve_stack)
     {
       if (!PARAM_SET_P (PARAM_LARGE_STACK_FRAME))
@@ -1698,6 +1717,10 @@ common_handle_option (size_t scode, const char *arg, int value,
       set_Wextra (value);
       break;
 
+    case OPT_Werror:
+      flag_werror_set = true;
+      break;
+
     case OPT_Werror_:
       enable_warning_as_error (arg, value, lang_mask);
       break;
@@ -1960,6 +1983,15 @@ common_handle_option (size_t scode, const char *arg, int value,
         flag_inline_functions = value;
       break;
 
+    case OPT_fpmu_profile_generate_:
+      /* This should be ideally turned on in conjunction with
+         -fprofile-dir or -fprofile-generate in order to specify a
+         profile directory.  */
+      if (check_pmu_profile_options (arg))
+        error ("Unrecognized pmu_profile_generate value \"%s\"", arg);
+      flag_pmu_profile_generate = xstrdup (arg);
+      break;
+
     case OPT_fprofile_values:
       flag_profile_values_set = true;
       break;
@@ -1989,6 +2021,10 @@ common_handle_option (size_t scode, const char *arg, int value,
 
     case OPT_fvpt:
       flag_value_profile_transformations_set = true;
+      break;
+
+    case OPT_ffvpt_functions_:
+      ffvpt_options = ffvtp_process_options (arg);
       break;
 
     case OPT_frandom_seed:
@@ -2225,6 +2261,11 @@ common_handle_option (size_t scode, const char *arg, int value,
       /* No-op. Used by the driver and passed to us because it starts with f.  */
       break;
 
+    case OPT_Wuninitialized:
+      /* Also turn on maybe uninitialized warning.  */
+      warn_maybe_uninitialized = value;
+      break;
+
     default:
       /* If the flag was handled in a standard way, assume the lack of
 	 processing here is intentional.  */
@@ -2274,6 +2315,7 @@ set_Wextra (int setting)
     warn_uninitialized = 0;
   else if (warn_uninitialized != 1)
     warn_uninitialized = 2;
+  warn_maybe_uninitialized = setting;
 }
 
 /* Used to set the level of strict aliasing warnings, 
@@ -2489,6 +2531,8 @@ enable_warning_as_error (const char *arg, int value, unsigned int lang_mask)
 	  && cl_options[option_index].flag_var
 	  && kind == DK_ERROR)
 	*(int *) cl_options[option_index].flag_var = 1;
+	if (option_index == OPT_Wuninitialized)
+	  enable_warning_as_error ("maybe-uninitialized", value, lang_mask);
     }
   free (new_option);
 }

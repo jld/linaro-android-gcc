@@ -716,6 +716,37 @@ remove_dead_phis (basic_block bb)
   return something_changed;
 }
 
+/* Fix up references to VOP SSANAMEs defined by STMT
+   which is to be removed.  */
+
+static void
+fixup_vdef_refs (gimple stmt)
+{
+  struct voptype_d *vdefs;
+  use_operand_p use_op;
+  imm_use_iterator iter;
+
+  vdefs = gimple_vdef_ops (stmt);
+  while (vdefs)
+    {
+      int n, j;
+      tree prev_nm;
+      VEC(use_operand_p, heap) *fixup_opnds = NULL;
+
+      n = VDEF_NUM (vdefs);
+      gcc_assert (n == 1);
+      prev_nm = VDEF_OP (vdefs, 0);
+      FOR_EACH_IMM_USE_FAST (use_op, iter, VDEF_RESULT (vdefs))
+          VEC_safe_push (use_operand_p, heap, fixup_opnds, use_op);
+
+      for (j = 0;
+           VEC_iterate (use_operand_p, fixup_opnds, j, use_op);
+           ++j)
+        set_ssa_use_from_ptr (use_op, prev_nm);
+
+      vdefs = vdefs->next;
+    }
+}
 
 /* Remove dead statement pointed to by iterator I.  Receives the basic block BB
    containing I so that we don't have to look it up.  */
@@ -810,9 +841,6 @@ remove_dead_stmt (gimple_stmt_iterator *i, basic_block bb)
     {
       gimple_stmt_iterator gsi;
       gimple next_stmt;
-      struct voptype_d *vdefs;
-      use_operand_p use_op;
-      imm_use_iterator iter;
 
       gsi = gsi_for_stmt (stmt);
       gsi_next (&gsi);
@@ -829,26 +857,7 @@ remove_dead_stmt (gimple_stmt_iterator *i, basic_block bb)
 	}
 
       /* Now fixup SSA.   */
-      vdefs = gimple_vdef_ops (stmt);
-      while (vdefs)
-        {
-          int n, j;
-          tree prev_nm;
-          VEC(use_operand_p, heap) *fixup_opnds = NULL;
-
-          n = VDEF_NUM (vdefs);
-          gcc_assert (n == 1);
-          prev_nm = VDEF_OP (vdefs, 0);
-          FOR_EACH_IMM_USE_FAST (use_op, iter, VDEF_RESULT (vdefs))
-            VEC_safe_push (use_operand_p, heap, fixup_opnds, use_op);
-
-          for (j = 0;
-               VEC_iterate (use_operand_p, fixup_opnds, j, use_op);
-               ++j)
-            set_ssa_use_from_ptr (use_op, prev_nm);
-
-          vdefs = vdefs->next;
-        }
+      fixup_vdef_refs (stmt);
     }
   gsi_remove (i, true);  
   release_defs (stmt); 

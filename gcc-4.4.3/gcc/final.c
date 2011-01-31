@@ -1649,6 +1649,58 @@ final_end_function (void)
 #endif
 }
 
+
+static basic_block *start_to_bb = NULL;
+static basic_block *end_to_bb = NULL;
+static int bb_map_size = 0;
+static int bb_seq = 0;
+
+/* Dumper helper for basic block information. FILE is the assembly
+   output file, and INSN is the instruction being emitted.  */
+
+static void
+dump_basic_block_info (FILE *file, rtx insn)
+{
+  basic_block bb;
+
+  if (!flag_debug_asm)
+    return;
+
+  if (INSN_UID (insn) < bb_map_size
+      && (bb = start_to_bb[INSN_UID (insn)]) != NULL)
+    {
+      edge e;
+      edge_iterator ei;
+
+      fprintf (file, "# BLOCK %d", bb->index);
+      if (bb->frequency)
+        fprintf (file, " freq:%d", bb->frequency);
+      if (bb->count)
+        fprintf (file, " count:" HOST_WIDEST_INT_PRINT_DEC,
+                 bb->count);
+      fprintf (file, " seq:%d", bb_seq++);
+      fprintf (file, "\n# PRED:");
+      FOR_EACH_EDGE (e, ei, bb->preds)
+        {
+          dump_edge_info (file, e, 0);
+        }
+      fprintf (file, "\n");
+    }
+  if (INSN_UID (insn) < bb_map_size
+      && (bb = end_to_bb[INSN_UID (insn)]) != NULL)
+    {
+      edge e;
+      edge_iterator ei;
+
+      fprintf (asm_out_file, "# SUCC:");
+      FOR_EACH_EDGE (e, ei, bb->succs)
+       {
+         dump_edge_info (asm_out_file, e, 1);
+       }
+      fprintf (file, "\n");
+    }
+}
+
 /* Output assembler code for some insns: all or part of a function.
    For description of args, see `final_start_function', above.  */
 
@@ -1683,6 +1735,21 @@ final (rtx first, FILE *file, int optimize)
 
   CC_STATUS_INIT;
 
+  if (flag_debug_asm)
+    {
+      basic_block bb;
+
+      bb_map_size = get_max_uid () + 1;
+      start_to_bb = XCNEWVEC (basic_block, bb_map_size);
+      end_to_bb = XCNEWVEC (basic_block, bb_map_size);
+
+      FOR_EACH_BB_REVERSE (bb)
+	{
+	  start_to_bb[INSN_UID (BB_HEAD (bb))] = bb;
+	  end_to_bb[INSN_UID (BB_END (bb))] = bb;
+	}
+    }
+
   /* Output the insns.  */
   for (insn = first; insn;)
     {
@@ -1698,7 +1765,18 @@ final (rtx first, FILE *file, int optimize)
 	insn_current_address = INSN_ADDRESSES (INSN_UID (insn));
 #endif /* HAVE_ATTR_length */
 
+      dump_basic_block_info (file, insn);
       insn = final_scan_insn (insn, file, optimize, 0, &seen);
+    }
+
+  if (flag_debug_asm)
+    {
+      free (start_to_bb);
+      free (end_to_bb);
+      start_to_bb = NULL;
+      end_to_bb = NULL;
+      bb_map_size = 0;
+      bb_seq = 0;
     }
 }
 
@@ -1833,10 +1911,6 @@ final_scan_insn (rtx insn, FILE *file, int optimize ATTRIBUTE_UNUSED,
 #ifdef TARGET_UNWIND_INFO
 	  targetm.asm_out.unwind_emit (asm_out_file, insn);
 #endif
-
-	  if (flag_debug_asm)
-	    fprintf (asm_out_file, "\t%s basic block %d\n",
-		     ASM_COMMENT_START, NOTE_BASIC_BLOCK (insn)->index);
 
 	  if ((*seen & (SEEN_EMITTED | SEEN_BB)) == SEEN_BB)
 	    {
@@ -4203,13 +4277,35 @@ debug_free_queue (void)
       symbol_queue_size = 0;
     }
 }
-
+
+/* List the call graph profiled edges in the ".note.callgraph.text" section. */
+static void
+cgraph_get_profiles (void)
+{
+  struct cgraph_node *node = cgraph_node (current_function_decl);
+  struct cgraph_edge *e;
+  struct cgraph_node *callee;
+
+  for (e = node->callees; e != NULL; e = e->next_callee)
+    {
+      if (e->count <= PARAM_VALUE (PARAM_NOTE_CGRAPH_SECTION_EDGE_THRESHOLD))
+        continue;
+      callee = e->callee;
+      fprintf (asm_out_file, "\t.string \"%s\"\n",
+               IDENTIFIER_POINTER (decl_assembler_name (callee->decl)));
+      fprintf (asm_out_file, "\t.string \"" HOST_WIDEST_INT_PRINT_DEC "\"\n",
+               e->count);
+    }
+}
+
 /* Turn the RTL into assembly.  */
 static unsigned int
 rest_of_handle_final (void)
 {
   rtx x;
   const char *fnname;
+  char *profile_fnname;
+  unsigned int flags;
 
   /* Get the function's name, as described by its RTL.  This may be
      different from the DECL_NAME name used in the source file.  */
@@ -4274,6 +4370,22 @@ rest_of_handle_final (void)
     targetm.asm_out.destructor (XEXP (DECL_RTL (current_function_decl), 0),
 				decl_fini_priority_lookup
 				  (current_function_decl));
+
+  /* With -fcgraph-section, add ".note.callgraph.text" section for storing
+     profiling information. */
+  if (flag_cgraph_section
+      && flag_profile_use
+      && cgraph_node (current_function_decl) != NULL)
+    {
+      flags = SECTION_NOTYPE;
+      profile_fnname = (char *)xmalloc(strlen(".note.callgraph.text.")
+                                       + strlen(fnname) + 1);
+      sprintf(profile_fnname, ".note.callgraph.text.%s", fnname);
+      switch_to_section(get_section(profile_fnname, flags, NULL));
+      fprintf (asm_out_file, "\t.string \"Function %s\"\n", fnname);
+      cgraph_get_profiles ();
+      free (profile_fnname);
+    }
   return 0;
 }
 

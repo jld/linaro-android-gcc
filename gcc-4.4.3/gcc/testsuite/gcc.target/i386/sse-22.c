@@ -5,9 +5,10 @@
 #include <mm_malloc.h>
 
 /* Test that the intrinsics compile without optimization.  All of them are
-   defined as inline functions in {,x,e,p,t,s,w,a,b}mmintrin.h  and mm3dnow.h
-   that reference the proper builtin functions.  Defining away "extern" and
-   "__inline" results in all of them being compiled as proper functions.  */
+   defined as inline functions in {,x,e,p,t,s,w,a,b}mmintrin.h, lwpintrin.h
+   and mm3dnow.h that reference the proper builtin functions.  Defining away
+   "extern" and "__inline" results in all of them being compiled as proper
+   functions.  */
 
 #define extern
 #define __inline
@@ -37,7 +38,7 @@
 
 
 #ifndef DIFFERENT_PRAGMAS
-#pragma GCC target ("mmx,3dnow,sse,sse2,sse3,ssse3,sse4.1,sse4.2,sse5,aes,pclmul")
+#pragma GCC target ("mmx,3dnow,sse,sse2,sse3,ssse3,sse4.1,sse4.2,sse5,aes,pclmul,lwp")
 #endif
 
 /* Following intrinsics require immediate arguments.  They
@@ -169,3 +170,16 @@ test_1 (_mm_round_pd, __m128d, __m128d, 1)
 test_1 (_mm_round_ps, __m128, __m128, 1)
 test_2 (_mm_round_sd, __m128d, __m128d, __m128d, 1)
 test_2 (_mm_round_ss, __m128, __m128, __m128, 1)
+
+#ifdef DIFFERENT_PRAGMAS
+#pragma GCC target ("lwp")
+#endif
+#include <x86intrin.h>
+
+/* lwpintrin.h (LWP). */
+test_2 ( __lwpval32, void, unsigned int, unsigned int, 1)
+test_2 ( __lwpins32, unsigned char, unsigned int, unsigned int, 1)
+#ifdef __x86_64__
+test_2 ( __lwpval64, void, unsigned long long, unsigned int, 1)
+test_2 ( __lwpins64, unsigned char, unsigned long long, unsigned int, 1)
+#endif

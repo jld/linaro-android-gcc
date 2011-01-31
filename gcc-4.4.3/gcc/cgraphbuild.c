@@ -34,6 +34,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gcov-io.h"
 #include "coverage.h"
 #include "tree-pass.h"
+#include "tree-sample-profile.h"
 
 /* Walk tree and record all calls and references to functions/variables.
    Called via walk_tree: TP is pointer to tree to be examined.  */
@@ -61,7 +62,10 @@ record_reference (tree *tp, int *walk_subtrees, void *data ATTRIBUTE_UNUSED)
 	 functions reachable unconditionally.  */
       decl = TREE_OPERAND (*tp, 0);
       if (TREE_CODE (decl) == FUNCTION_DECL)
-	cgraph_mark_needed_node (cgraph_node (decl));
+	{
+	  cgraph_mark_needed_node (cgraph_node (decl));
+	  cgraph_mark_address_taken (cgraph_node (decl));
+	}
       break;
 
     default:
@@ -162,8 +166,30 @@ add_fake_indirect_call_edges (struct cgraph_node *node)
       = get_coverage_counts_no_warn (DECL_STRUCT_FUNCTION (node->decl),
                                      GCOV_COUNTER_ICALL_TOPNV, &n_counts);
 
-  if (!ic_counts)
+  if (!ic_counts && !flag_sample_profile)
     return;
+
+  /* For sample profile, we find the th indirect callees by its names.  */
+  if (flag_sample_profile)
+    {
+      struct sample_indirect_call *ic =
+          sp_get_indirect_calls (cgraph_node_name (node));
+      if (!ic)
+        return;
+      for (i = 0; i < ic->num_values; i++)
+        {
+          struct cgraph_node *callee = find_func_by_name (ic->targets[i]);
+          if (callee)
+            {
+              struct cgraph_edge *e;
+              tree decl = callee->decl;
+              e = cgraph_create_edge (node, cgraph_real_node (decl), NULL,
+                                      ic->count[i], 0, 0);
+              e->indirect_call = 1;
+            }
+        }
+      return;
+    }
 
   gcc_assert ((n_counts % GCOV_ICALL_TOPN_NCOUNTS) == 0);
 

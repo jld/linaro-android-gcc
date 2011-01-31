@@ -43,6 +43,6 @@ int func()
   bar_array[x+g].b_ = bar_array[x+g].b_ / 1; // should not warn
   x += 0;
   y -= 0;
-  foo = foo;           // { dg-warning "assigned to itself" }
+  foo = foo;
   foo.operator=(foo);  // should not warn
 }

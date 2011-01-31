@@ -40,8 +40,8 @@ int func()
   *f = *f; // { dg-warning "assigned to itself" }
   bar1->b_ = bar1->b_; // { dg-warning "assigned to itself" }
   bar2.c_ = bar2.c_; // { dg-warning "assigned to itself" }
-  local_foo = local_foo; // { dg-warning "assigned to itself" }
-  foo = foo; // { dg-warning "assigned to itself" }
+  local_foo = local_foo;
+  foo = foo;
   foo.setA(5);
   bar_array[3].c_ = bar_array[3].c_; // { dg-warning "assigned to itself" }
   bar_array[x+g].b_ = bar_array[x+g].b_; // { dg-warning "assigned to itself" }

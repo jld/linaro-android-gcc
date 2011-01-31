@@ -32,6 +32,13 @@ MULTILIB_OPTIONS	+= $(MLOPT_armv7a)
 MULTILIB_DIRNAMES 	+= $(MLDIR_armv7a)
 MULTILIB_MATCHES 	+= $(MLMATCH_armv7a)
 
+# Not quite true.  We can support hard-vfp calling in Thumb2, but how do we
+# express that here?  Also, we really need architecture v5e or later
+# (mcrr etc).
+MULTILIB_OPTIONS       += mfloat-abi=hard
+MULTILIB_DIRNAMES      += fpu
+MULTILIB_EXCEPTIONS    += *mthumb/*mfloat-abi=hard*
+
 # MULTILIB_OPTIONS    += mcpu=ep9312
 # MULTILIB_DIRNAMES   += ep9312
 # MULTILIB_EXCEPTIONS += *mthumb/*mcpu=ep9312*

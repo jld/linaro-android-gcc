@@ -1,5 +1,5 @@
 /* Language-dependent hooks for C++.
-   Copyright 2001, 2002, 2004, 2007, 2008 Free Software Foundation, Inc.
+   Copyright 2001, 2002, 2004, 2007, 2008, 2009 Free Software Foundation, Inc.
    Contributed by Alexandre Oliva  <aoliva@redhat.com>
 
 This file is part of GCC.
@@ -80,6 +80,8 @@ static bool cp_is_global_delete_fndecl_p (tree);
 #define LANG_HOOKS_DECL_IS_CONSTRUCTOR cp_decl_is_constructor
 #undef LANG_HOOKS_DECL_IS_DESTRUCTOR
 #define LANG_HOOKS_DECL_IS_DESTRUCTOR cp_decl_is_destructor
+#undef LANG_HOOKS_DECL_IS_CONST_MEMBER_FUNC
+#define LANG_HOOKS_DECL_IS_CONST_MEMBER_FUNC cp_decl_is_const_member_func
 
 /* LIPO support.  */
 #undef LANG_HOOKS_ADD_BUILT_IN_DECL
@@ -163,7 +165,9 @@ cxx_dwarf_name (tree t, int verbosity)
   gcc_assert (DECL_P (t));
 
   if (verbosity >= 2)
-    return decl_as_string (t, TFF_DECL_SPECIFIERS | TFF_UNQUALIFIED_NAME);
+    return decl_as_string (t,
+			   TFF_DECL_SPECIFIERS | TFF_UNQUALIFIED_NAME
+			   | TFF_NO_OMIT_DEFAULT_TEMPLATE_ARGUMENTS);
 
   return cxx_printable_name (t, verbosity);
 }

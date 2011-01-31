@@ -1,7 +1,7 @@
 /* Test for stack alignment when PREFERRED_STACK_BOUNDARY < alignment
    of local variable.  */
 /* { dg-do compile } */
-/* { dg-options "-O2 -mpreferred-stack-boundary=6 -mincoming-stack-boundary=6" } */
+/* { dg-options "-O2 -mpreferred-stack-boundary=6 -mincoming-stack-boundary=6 -fno-inline" } */
 /* { dg-final { scan-assembler "and\[lq\]?\[\\t \]*\\$-128,\[\\t \]*%\[re\]?sp" } } */
 /* { dg-final { scan-assembler-not "and\[lq\]?\[\\t \]*\\$-64,\[\\t \]*%\[re\]?sp" } } */
 

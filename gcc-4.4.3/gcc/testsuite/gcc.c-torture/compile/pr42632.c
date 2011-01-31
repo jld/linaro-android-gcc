@@ -8,7 +8,7 @@ int pskb_trim(void)
 {
   return __pskb_trim();
 }
-int ___pskb_trim(void)
+inline __attribute__((noinline)) int ___pskb_trim(void)
 {
   pskb_trim();
   return 0;

@@ -114,7 +114,7 @@ lhd_do_nothing_u (unsigned ARG_UNUSED (t))
 int
 lhd_do_nothing_t_return_int (tree ARG_UNUSED (t))
 {
-  return false;
+  return 0;
 }
 
 bool

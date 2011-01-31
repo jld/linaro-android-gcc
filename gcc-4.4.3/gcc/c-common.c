@@ -523,6 +523,7 @@ static tree check_case_value (tree);
 static bool check_case_bounds (tree, tree, tree *, tree *);
 
 static tree handle_packed_attribute (tree *, tree, tree, int, bool *);
+static tree handle_version_selector_attribute (tree *, tree, tree, int, bool *);
 static tree handle_nocommon_attribute (tree *, tree, tree, int, bool *);
 static tree handle_common_attribute (tree *, tree, tree, int, bool *);
 static tree handle_noreturn_attribute (tree *, tree, tree, int, bool *);
@@ -775,6 +776,8 @@ const unsigned int num_c_common_reswords =
 const struct attribute_spec c_common_attribute_table[] =
 {
   /* { name, min_len, max_len, decl_req, type_req, fn_type_req, handler } */
+  { "version_selector",	      0, 0, true, false, false,
+			      handle_version_selector_attribute },
   { "packed",                 0, 0, false, false, false,
 			      handle_packed_attribute },
   { "nocommon",               0, 0, true,  false, false,
@@ -913,6 +916,16 @@ const struct attribute_spec c_common_attribute_table[] =
   { "lock_returned",          1, 1, true,  false, false,
                               handle_lock_returned_attribute },
   { "no_thread_safety_analysis", 0, 0, true,  false, false,
+                              handle_no_thread_safety_analysis_attribute },
+  { "ignore_reads_begin",     0, 0, true,  false, false,
+                              handle_no_thread_safety_analysis_attribute },
+  { "ignore_reads_end",       0, 0, true,  false, false,
+                              handle_no_thread_safety_analysis_attribute },
+  { "ignore_writes_begin",    0, 0, true,  false, false,
+                              handle_no_thread_safety_analysis_attribute },
+  { "ignore_writes_end",      0, 0, true,  false, false,
+                              handle_no_thread_safety_analysis_attribute },
+  { "unprotected_read",       0, 0, true,  false, false,
                               handle_no_thread_safety_analysis_attribute },
   { NULL,                     0, 0, false, false, false, NULL }
 };
@@ -5211,6 +5224,37 @@ handle_packed_attribute (tree *node, tree name, tree ARG_UNUSED (args),
   return NULL_TREE;
 }
 
+/* Handle a "version_selector attribute".
+   Functions are marked with attribute "version_selector" only if
+   they are run-time constants.  Example of such functions would
+   be those that test if a particular feature is available on a
+   particular architecture.  Such function must return a positive
+   integer. For two-way functions, those that test if a feature
+   is present or not must return 1 or 0 respectively. */
+
+static tree
+handle_version_selector_attribute (tree *node, tree name,
+ 				   tree ARG_UNUSED (args),
+ 				   int ARG_UNUSED (flags),
+				   bool *no_add_attrs)
+{
+  if (TREE_CODE (*node) == FUNCTION_DECL)
+    {
+      /* Check that the return type is integer. */
+      gcc_assert (TREE_CODE (TREE_TYPE (TREE_TYPE (*node)))
+                  == INTEGER_TYPE);
+      if (dump_file)
+        fprintf (dump_file, "%s is a version_selector function\n",
+   	         IDENTIFIER_POINTER (DECL_NAME (*node)));
+    }
+  else
+    {
+      warning (OPT_Wattributes, "%qE attribute ignored", name);
+      *no_add_attrs = true;
+    }
+  return NULL_TREE;
+}
+
 /* Handle a "nocommon" attribute; arguments as in
    struct attribute_spec.handler.  */
 
@@ -6696,7 +6740,7 @@ handle_nonnull_attribute (tree *node, tree ARG_UNUSED (name),
 
   /* Argument list specified.  Verify that each argument number references
      a pointer argument.  */
-  for (attr_arg_num = 1; args; args = TREE_CHAIN (args))
+  for (attr_arg_num = 1; args; args = TREE_CHAIN (args), attr_arg_num++)
     {
       tree argument;
       unsigned HOST_WIDE_INT arg_num = 0, ck_num;
@@ -6728,6 +6772,7 @@ handle_nonnull_attribute (tree *node, tree ARG_UNUSED (name),
 	      return NULL_TREE;
 	    }
 
+
 	  if (TREE_CODE (TREE_VALUE (argument)) != POINTER_TYPE)
 	    {
 	      error ("nonnull argument references non-pointer operand (argument %lu, operand %lu)",
@@ -6735,6 +6780,11 @@ handle_nonnull_attribute (tree *node, tree ARG_UNUSED (name),
 	      *no_add_attrs = true;
 	      return NULL_TREE;
 	    }
+
+          if (TREE_CODE (type) == METHOD_TYPE && arg_num == 1)
+            warning (OPT_Wattributes,
+                     "nonnull argument references 'this' pointer (argument %lu, operand %lu)",
+                     (unsigned long) attr_arg_num, (unsigned long) arg_num);
 	}
     }
 
@@ -7374,14 +7424,9 @@ static tree
 handle_point_to_guarded_by_attribute (tree *node, tree name, tree args,
                                       int flags, bool *no_add_attrs)
 {
-  /* point_to_guarded_by attribute can only annotate a pointer.  */
-  if (!POINTER_TYPE_P (TREE_TYPE (*node)))
-    {
-      warning (OPT_Wattributes,
-               "%qE attribute ignored for a non-pointer", name);
-      *no_add_attrs = true;
-      return NULL_TREE;
-    }
+  /* We used to check if the point_to_guarded_by attribute is applied to
+     a pointer, but no longer do that as we now allow the attribute to
+     be applied to smart/scoped pointer objects.  */
 
   /* The rest of the handler is identical to the handler for
      the guarded_by attr.  */
@@ -7414,14 +7459,9 @@ static tree
 handle_point_to_guarded_attribute (tree *node, tree name, tree args,
                                    int flags, bool *no_add_attrs)
 {
-  /* point_to_guarded attribute can only annotate a pointer.  */
-  if (!POINTER_TYPE_P (TREE_TYPE (*node)))
-    {
-      warning (OPT_Wattributes,
-               "%qE attribute ignored for a non-pointer", name);
-      *no_add_attrs = true;
-      return NULL_TREE;
-    }
+  /* We used to check if the point_to_guarded attribute is applied to
+     a pointer, but no longer do that as we now allow the attribute to
+     be applied to smart/scoped pointer objects.  */
 
   /* The rest of the handler is identical to the handler for guarded attr.  */
   return handle_guarded_attribute (node, name, args, flags, no_add_attrs);

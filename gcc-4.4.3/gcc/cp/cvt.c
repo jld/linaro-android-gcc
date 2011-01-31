@@ -1116,7 +1116,7 @@ build_expr_type_conversion (int desires, tree expr, bool complain)
   if (expr == null_node
       && (desires & WANT_INT)
       && !(desires & WANT_NULL))
-    warning (OPT_Wnull_conversion, "converting NULL to non-pointer type");
+    warning (OPT_Wconversion_null, "converting NULL to non-pointer type");
 
   basetype = TREE_TYPE (expr);
 

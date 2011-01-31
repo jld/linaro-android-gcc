@@ -2635,6 +2635,10 @@ as non-null, and the @option{-Wnonnull} option is enabled, a warning
 is issued.  The compiler may also choose to make optimizations based
 on the knowledge that certain function arguments will not be null.
 
+Since non-static C++ methods have an implicit @code{this} argument, the
+arguments of such methods should be counted from two, not one, when
+giving values for @var{arg-index}.
+
 If no argument index list is given to the @code{nonnull} attribute,
 all pointer arguments are marked as non-null.  To illustrate, the
 following declaration is equivalent to the previous example:
@@ -2720,6 +2724,28 @@ This can be used for instance to have frequently executed functions
 compiled with more aggressive optimization options that produce faster
 and larger code, while other functions can be called with less
 aggressive options.
+
+@item pcs
+@cindex @code{pcs} function attribute
+
+The @code{pcs} attribute can be used to control the calling convention
+used for a function on ARM.  The attribute takes an argument that specifies
+the calling convention to use.
+
+When compiling using the AAPCS ABI (or a variant of that) then valid
+values for the argument are @code{"aapcs"} and @code{"aapcs-vfp"}.  In
+order to use a variant other than @code{"aapcs"} then the compiler must
+be permitted to use the appropriate co-processor registers (i.e., the
+VFP registers must be available in order to use @code{"aapcs-vfp"}).
+For example,
+
+@smallexample
+/* Argument passed in r0, and result returned in r0+r1.  */
+double f2d (float) __attribute__((pcs("aapcs")));
+@end smallexample
+
+Variadic functions always use the @code{"aapcs"} calling convention and
+the compiler will reject attempts to specify an alternative.
 
 @item pure
 @cindex @code{pure} function attribute
@@ -3021,6 +3047,11 @@ Enable/disable the generation of the SSE4A instructions.
 @itemx no-sse5
 @cindex @code{target("sse5")} attribute
 Enable/disable the generation of the SSE5 instructions.
+
+@item lwp
+@itemx no-lwp
+@cindex @code{target("lwp")} attribute
+Enable/disable the generation of the LWP instructions.
 
 @item ssse3
 @itemx no-ssse3
@@ -8702,6 +8733,23 @@ v16qi __builtin_ia32_protb_imm (v16qi, int)
 v4si __builtin_ia32_protd_imm (v4si, int)
 v2di __builtin_ia32_protq_imm (v2di, int)
 v8hi __builtin_ia32_protw_imm (v8hi, int)
+@end smallexample
+
+The following built-in functions are available when @option{-mlwp} is used.
+
+@smallexample
+void __builtin_ia32_llwpcb16 (void *);
+void __builtin_ia32_llwpcb32 (void *);
+void __builtin_ia32_llwpcb64 (void *);
+void * __builtin_ia32_llwpcb16 (void);
+void * __builtin_ia32_llwpcb32 (void);
+void * __builtin_ia32_llwpcb64 (void);
+void __builtin_ia32_lwpval16 (unsigned short, unsigned int, unsigned short)
+void __builtin_ia32_lwpval32 (unsigned int, unsigned int, unsigned int)
+void __builtin_ia32_lwpval64 (unsigned __int64, unsigned int, unsigned int)
+unsigned char __builtin_ia32_lwpins16 (unsigned short, unsigned int, unsigned short)
+unsigned char __builtin_ia32_lwpins32 (unsigned int, unsigned int, unsigned int)
+unsigned char __builtin_ia32_lwpins64 (unsigned __int64, unsigned int, unsigned int)
 @end smallexample
 
 The following built-in functions are available when @option{-m3dnow} is used.

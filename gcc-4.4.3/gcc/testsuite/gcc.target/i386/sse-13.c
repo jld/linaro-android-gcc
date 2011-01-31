@@ -1,12 +1,13 @@
 /* { dg-do compile } */
-/* { dg-options "-O2 -Werror-implicit-function-declaration -march=k8 -m3dnow -mavx -msse5 -maes -mpclmul" } */
+/* { dg-options "-O2 -Werror-implicit-function-declaration -march=k8 -m3dnow -mavx -msse5 -maes -mpclmul -mlwp" } */
 
 #include <mm_malloc.h>
 
 /* Test that the intrinsics compile with optimization.  All of them are
-   defined as inline functions in {,x,e,p,t,s,w,a,b,i}mmintrin.h and mm3dnow.h
-   that reference the proper builtin functions.  Defining away "extern" and
-   "__inline" results in all of them being compiled as proper functions.  */
+   defined as inline functions in {,x,e,p,t,s,w,a,b,i}mmintrin.h, lwpintrin.h
+   and mm3dnow.h that reference the proper builtin functions.  Defining away
+   "extern" and "__inline" results in all of them being compiled as proper
+   functions.  */
 
 #define extern
 #define __inline
@@ -131,5 +132,11 @@
 #define __builtin_ia32_protwi(A, B) __builtin_ia32_protwi(A,1)
 #define __builtin_ia32_protdi(A, B) __builtin_ia32_protdi(A,1)
 #define __builtin_ia32_protqi(A, B) __builtin_ia32_protqi(A,1)
+
+/* lwpintrin.h */
+#define __builtin_ia32_lwpval32(D2, D1, F) __builtin_ia32_lwpval32 (D2, D1, 1)
+#define __builtin_ia32_lwpval64(D2, D1, F) __builtin_ia32_lwpval64 (D2, D1, 1)
+#define __builtin_ia32_lwpins32(D2, D1, F) __builtin_ia32_lwpins32 (D2, D1, 1)
+#define __builtin_ia32_lwpins64(D2, D1, F) __builtin_ia32_lwpins64 (D2, D1, 1)
 
 #include <x86intrin.h>

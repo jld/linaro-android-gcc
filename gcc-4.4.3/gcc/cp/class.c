@@ -8090,4 +8090,22 @@ cp_decl_is_destructor (tree decl)
   return DECL_DESTRUCTOR_P (decl);
 }
 
+/* Return
+   1 if decl is a const member function,
+   2 if decl is not a const member function but has a const overload that
+     has identical parameter list,
+   0 otherwise.  */
+
+int
+cp_decl_is_const_member_func (tree decl)
+{
+  if (DECL_CONST_MEMFUNC_P (decl))
+    return 1;
+  else if (DECL_ATTRIBUTES (decl)
+	   && lookup_attribute ("has_const_overload", DECL_ATTRIBUTES (decl)))
+    return 2;
+  else
+    return 0;
+}
+
 #include "gt-cp-class.h"

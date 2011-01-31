@@ -242,6 +242,15 @@ struct sample_inline_freq
   float freq;
 };
 
+#define MAX_IND_FUNCS 1024
+struct sample_indirect_call
+{
+  const char *func_name;
+  unsigned num_values;
+  const char *targets[MAX_IND_FUNCS];
+  unsigned long long count[MAX_IND_FUNCS];
+};
+
 /* Store profile per feedback data file.  */
 struct profile
 {
@@ -260,4 +269,5 @@ extern void sp_add_funcname_mapping (const char *, const char *);
 extern const char *sp_get_real_funcname (const char *name);
 extern void sp_set_sample_profile (gcov_type max_count);
 extern void gimple_sample_vpt (gimple, struct sample_hist *, int);
+extern struct sample_indirect_call *sp_get_indirect_calls (const char *);
 #endif

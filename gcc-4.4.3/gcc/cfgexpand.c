@@ -42,7 +42,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-inline.h"
 #include "value-prof.h"
 #include "target.h"
-
+#include "tree-stack-overlay.h"
 
 /* Return an expression tree corresponding to the RHS of GIMPLE
    statement STMT.  */
@@ -871,6 +871,21 @@ dump_stack_var_partition (void)
     }
 }
 
+static void
+sort_stack_vars (void)
+{
+  size_t si, n = stack_vars_num;
+
+  stack_vars_sorted = XNEWVEC (size_t, stack_vars_num);
+  for (si = 0; si < n; ++si)
+    stack_vars_sorted[si] = si;
+
+  if (n == 1)
+    return;
+
+  qsort (stack_vars_sorted, n, sizeof (size_t), stack_var_size_cmp);
+}
+
 /* Assign rtl to DECL at frame offset OFFSET.  */
 
 static void
@@ -896,6 +911,34 @@ expand_one_stack_var_at (tree decl, HOST_WIDE_INT offset)
 
   set_mem_attributes (x, decl, true);
   SET_DECL_RTL (decl, x);
+  if (flag_early_stack_alloc)
+    {
+      /* If this decl is synthesized by stack_overlay pass, copy the RTL
+         to the original DECLs and remove this decl from BLOCK_VARS to
+         generate proper debug info. */
+      VEC(tree,gc) *orig_vars = get_original_stack_vars (decl);
+      if (VEC_length(tree,orig_vars))
+        {
+          tree t, outer_block = DECL_INITIAL (current_function_decl);
+          int ix=0;
+          /* Set RTL to original variables. */
+          for (ix = 0; VEC_iterate(tree,orig_vars,ix,t); ix++)
+            SET_DECL_RTL (t, x);
+          /* Remove decl from BLOCK_VARS. */
+          t = BLOCK_VARS (outer_block);
+          if (t == decl)
+            BLOCK_VARS (outer_block) = TREE_CHAIN (t);
+          else
+            {
+              for (; t ; t = TREE_CHAIN (t))
+                if (TREE_CHAIN (t) == decl)
+                  {
+                    TREE_CHAIN (t) = TREE_CHAIN (decl);
+                    break;
+                  }
+            }
+        }
+    }
 }
 
 /* A subroutine of expand_used_vars.  Give each partition representative
@@ -1045,6 +1088,11 @@ defer_stack_allocation (tree var, bool toplevel)
   if (flag_stack_protect)
     return true;
 
+  /* If stack protection is not required and variable coalescing happens
+     in an earlier pass, no need to defer allocation.  */
+  if (flag_early_stack_alloc)
+    return false;
+
   /* Variables in the outermost scope automatically conflict with
      every other variable.  The only reason to want to defer them
      at all is that, after sorting, we can more efficiently pack
@@ -1063,6 +1111,7 @@ defer_stack_allocation (tree var, bool toplevel)
 
   return true;
 }
+
 
 /* A subroutine of expand_used_vars.  Expand one variable according to
    its flavor.  Variables to be placed on the stack are not actually
@@ -1282,10 +1331,23 @@ stack_protect_decl_phase (tree decl)
   else
     ret = (bits & SPCT_HAS_LARGE_CHAR_ARRAY) != 0;
 
-  if (ret)
+  if (!flag_early_stack_alloc && ret)
     has_protected_decls = true;
 
   return ret;
+}
+
+static bool
+need_stack_protection (void)
+{
+  size_t i, n = stack_vars_num;
+
+  if (!flag_stack_protect)
+    return false;
+  for (i = 0; i < n; ++i)
+    if (stack_protect_decl_phase (stack_vars[i].decl))
+      return true;
+  return false;
 }
 
 /* Two helper routines that check for phase 1 and phase 2.  These are used
@@ -1475,35 +1537,37 @@ expand_used_vars (void)
   for (; t; t = next)
     {
       tree var = TREE_VALUE (t);
-      bool expand_now = false;
+      bool expand_now = flag_early_stack_alloc;
 
       next = TREE_CHAIN (t);
+      if (!flag_early_stack_alloc)
+        {
+          /* We didn't set a block for static or extern because it's hard
+             to tell the difference between a global variable (re)declared
+             in a local scope, and one that's really declared there to
+             begin with.  And it doesn't really matter much, since we're
+             not giving them stack space.  Expand them now.  */
+          if (TREE_STATIC (var) || DECL_EXTERNAL (var))
+            expand_now = true;
 
-      /* We didn't set a block for static or extern because it's hard
-	 to tell the difference between a global variable (re)declared
-	 in a local scope, and one that's really declared there to
-	 begin with.  And it doesn't really matter much, since we're
-	 not giving them stack space.  Expand them now.  */
-      if (TREE_STATIC (var) || DECL_EXTERNAL (var))
-	expand_now = true;
+          /* Any variable that could have been hoisted into an SSA_NAME
+             will have been propagated anywhere the optimizers chose,
+             i.e. not confined to their original block.  Allocate them
+             as if they were defined in the outermost scope.  */
+          else if (is_gimple_reg (var))
+            expand_now = true;
 
-      /* Any variable that could have been hoisted into an SSA_NAME
-	 will have been propagated anywhere the optimizers chose,
-	 i.e. not confined to their original block.  Allocate them
-	 as if they were defined in the outermost scope.  */
-      else if (is_gimple_reg (var))
-	expand_now = true;
+          /* If the variable is not associated with any block, then it
+             was created by the optimizers, and could be live anywhere
+             in the function.  */
+          else if (TREE_USED (var))
+            expand_now = true;
 
-      /* If the variable is not associated with any block, then it
-	 was created by the optimizers, and could be live anywhere
-	 in the function.  */
-      else if (TREE_USED (var))
-	expand_now = true;
+          /* Finally, mark all variables on the list as used.  We'll use
+             this in a moment when we expand those associated with scopes.  */
+          TREE_USED (var) = 1;
 
-      /* Finally, mark all variables on the list as used.  We'll use
-	 this in a moment when we expand those associated with scopes.  */
-      TREE_USED (var) = 1;
-
+        }
       if (expand_now)
 	{
 	  expand_one_var (var, true, true);
@@ -1525,11 +1589,14 @@ expand_used_vars (void)
       ggc_free (t);
     }
 
-  /* At this point, all variables within the block tree with TREE_USED
-     set are actually used by the optimized function.  Lay them out.  */
-  expand_used_vars_for_block (outer_block, true);
+  if (flag_early_stack_alloc)
+    has_protected_decls = need_stack_protection ();
+  else
+    /* At this point, all variables within the block tree with TREE_USED
+       set are actually used by the optimized function.  Lay them out.  */
+    expand_used_vars_for_block (outer_block, true);
 
-  if (stack_vars_num > 0)
+  if (!flag_early_stack_alloc && stack_vars_num > 0)
     {
       /* Due to the way alias sets work, no variables with non-conflicting
 	 alias sets may be assigned the same address.  Add conflicts to
@@ -1558,6 +1625,8 @@ expand_used_vars (void)
   /* Assign rtl to each variable based on these partitions.  */
   if (stack_vars_num > 0)
     {
+      if (flag_early_stack_alloc)
+        sort_stack_vars ();
       /* Reorder decls to be protected by iterating over the variables
 	 array multiple times, and allocating out of each phase in turn.  */
       /* ??? We could probably integrate this into the qsort we did
@@ -2245,8 +2314,18 @@ expand_stack_alignment (void)
       || crtl->has_nonlocal_goto)
     crtl->need_drap = true;
 
-  gcc_assert (crtl->stack_alignment_needed
-	      <= crtl->stack_alignment_estimated);
+  /* Call update_stack_boundary here again to update incoming stack
+     boundary.  It may set incoming stack alignment to a different
+     value after RTL expansion.  TARGET_FUNCTION_OK_FOR_SIBCALL may
+     use the minimum incoming stack alignment to check if it is OK
+     to perform sibcall optimization since sibcall optimization will
+     only align the outgoing stack to incoming stack boundary.  */
+  if (targetm.calls.update_stack_boundary)
+    targetm.calls.update_stack_boundary ();
+
+  /* The incoming stack frame has to be aligned at least at
+     parm_stack_boundary.  */
+  gcc_assert (crtl->parm_stack_boundary <= INCOMING_STACK_BOUNDARY);
 
   /* Update crtl->stack_alignment_estimated and use it later to align
      stack.  We check PREFERRED_STACK_BOUNDARY if there may be non-call
@@ -2261,6 +2340,9 @@ expand_stack_alignment (void)
     crtl->stack_alignment_estimated = preferred_stack_boundary;
   if (preferred_stack_boundary > crtl->stack_alignment_needed)
     crtl->stack_alignment_needed = preferred_stack_boundary;
+
+  gcc_assert (crtl->stack_alignment_needed
+	      <= crtl->stack_alignment_estimated);
 
   crtl->stack_realign_needed
     = INCOMING_STACK_BOUNDARY < crtl->stack_alignment_estimated;
@@ -2333,7 +2415,7 @@ gimple_expand_cfg (void)
   targetm.expand_to_rtl_hook ();
   crtl->stack_alignment_needed = STACK_BOUNDARY;
   crtl->max_used_stack_slot_alignment = STACK_BOUNDARY;
-  crtl->stack_alignment_estimated = STACK_BOUNDARY;
+  crtl->stack_alignment_estimated = 0;
   crtl->preferred_stack_boundary = STACK_BOUNDARY;
   cfun->cfg->max_jumptable_ents = 0;
 
@@ -2367,23 +2449,6 @@ gimple_expand_cfg (void)
      call to __main (if any) so that the external decl is initialized.  */
   if (crtl->stack_protect_guard)
     stack_protect_prologue ();
-
-  /* Update stack boundary if needed.  */
-  if (SUPPORTS_STACK_ALIGNMENT)
-    {
-      /* Call update_stack_boundary here to update incoming stack
-	 boundary before TARGET_FUNCTION_OK_FOR_SIBCALL is called.
-	 TARGET_FUNCTION_OK_FOR_SIBCALL needs to know the accurate
-	 incoming stack alignment to check if it is OK to perform
-	 sibcall optimization since sibcall optimization will only
-	 align the outgoing stack to incoming stack boundary.  */
-      if (targetm.calls.update_stack_boundary)
-	targetm.calls.update_stack_boundary ();
-      
-      /* The incoming stack frame has to be aligned at least at
-	 parm_stack_boundary.  */
-      gcc_assert (crtl->parm_stack_boundary <= INCOMING_STACK_BOUNDARY);
-    }
 
   /* Register rtl specific functions for cfg.  */
   rtl_register_cfg_hooks ();

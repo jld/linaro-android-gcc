@@ -27,7 +27,7 @@ main ()
   exit (0);
 }
 
-int
+int __attribute__((noinline))
 bar (b)
      int b;
 {
@@ -37,7 +37,7 @@ bar (b)
     abort ();
 }
 
-int
+int __attribute__((noinline))
 foo (f)
      int f;
 {

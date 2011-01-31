@@ -228,6 +228,8 @@ ipcp_update_cloned_node (struct cgraph_node *new_node)
 
       for (cs = new_node->callees; cs; cs = cs->next_callee)
 	{
+	  if (!cs->callee->analyzed)
+	    continue;
 	  ipa_count_arguments (cs);
 	  ipa_compute_jump_functions (cs);
 	}

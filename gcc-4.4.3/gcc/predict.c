@@ -172,11 +172,17 @@ cgraph_maybe_hot_edge_p (struct cgraph_edge *edge)
 {
   if (profile_info_available_p ()
       && (edge->count
-	  <= profile_info->sum_max / PARAM_VALUE (HOT_BB_COUNT_FRACTION))
-      && !(flag_sample_profile && get_total_count_edge (edge,
-            cgraph_node_name (edge->caller->global.inlined_to ?
-                              edge->caller->global.inlined_to :
-                              edge->caller)) > 0))
+	  <= profile_info->sum_max / PARAM_VALUE (HOT_BB_COUNT_FRACTION)))
+    return false;
+
+  /* For sample fdo, if the function doesn't have profile, it should be
+     cold.  */
+  if (flag_sample_profile &&
+      edge->count == 0 &&
+      get_total_count_edge (edge,
+          cgraph_node_name (edge->caller->global.inlined_to ?
+                            edge->caller->global.inlined_to :
+                            edge->caller)) == 0)
     return false;
   if (lookup_attribute ("cold", DECL_ATTRIBUTES (edge->callee->decl))
       || lookup_attribute ("cold", DECL_ATTRIBUTES (edge->caller->decl)))
@@ -2152,6 +2158,10 @@ compute_function_frequency (void)
       return;
     }
   cfun->function_frequency = FUNCTION_FREQUENCY_UNLIKELY_EXECUTED;
+  /* For sample profile, if the profile is not found, we can infer that
+     the function has not executed.  */
+  if (flag_sample_profile && profile_status != PROFILE_READ)
+    return;
   FOR_EACH_BB (bb)
     {
       if (maybe_hot_bb_p (bb))

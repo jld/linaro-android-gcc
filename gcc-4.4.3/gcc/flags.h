@@ -399,6 +399,16 @@ enum warn_strict_overflow_code
   WARN_STRICT_OVERFLOW_MAGNITUDE = 5
 };
 
+/* Math functions that the ffvpt-pass will profile and optimize.  */
+struct ffvpt_options_s
+{
+  bool exp_set;
+  bool log_set;
+  bool pow_set;
+  bool sqrt_set;
+};
+extern struct ffvpt_options_s ffvpt_options;
+
 /* Whether to emit an overflow warning whose code is C.  */
 #define issue_strict_overflow_warning(c) (warn_strict_overflow >= (int) (c))
 

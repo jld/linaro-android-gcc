@@ -14895,22 +14895,6 @@ decl_start_label (tree decl)
   return fnname;
 }
 #endif
-
-/* Returns the DIE for a context.  */
-
-static inline dw_die_ref
-get_context_die (tree context)
-{
-  if (context)
-    {
-      /* Find die that represents this context.  */
-      if (TYPE_P (context))
-	return force_type_die (context);
-      else
-	return force_decl_die (context);
-    }
-  return comp_unit_die;
-}
 
 /* These routines generate the internal representation of the DIE's for
    the compilation unit.  Debugging information is collected by walking
@@ -16827,17 +16811,6 @@ gen_type_die_with_usage (tree type, dw_die_ref context_die,
 	 statement.  */
       TREE_ASM_WRITTEN (type) = 1;
 
-      /* Figure out the proper context for the basis type.  If it is
-         local to a function, use NULL for now; it will be fixed up
-         in decls_for_scope.  */
-      if (TYPE_STUB_DECL (TREE_TYPE (type)) != NULL_TREE)
-        {
-          if (decl_function_context (TYPE_STUB_DECL (TREE_TYPE (type))))
-            context_die = NULL;
-          else
-            context_die = get_context_die (TYPE_CONTEXT (TREE_TYPE (type)));
-	}
-
       /* For these types, all that is required is that we output a DIE (or a
 	 set of DIEs) to represent the "basis" type.  */
       gen_type_die_with_usage (TREE_TYPE (type), context_die,
@@ -16904,6 +16877,15 @@ gen_type_die_with_usage (tree type, dw_die_ref context_die,
 	  push_decl_scope (TYPE_CONTEXT (type));
 	  context_die = lookup_type_die (TYPE_CONTEXT (type));
 	  need_pop = 1;
+	}
+      else if (TYPE_CONTEXT (type) != NULL_TREE
+	       && (TREE_CODE (TYPE_CONTEXT (type)) == FUNCTION_DECL))
+	{
+	  /* If this type is local to a function that hasn't been written
+	     out yet, use a NULL context for now; it will be fixed up in
+	     decls_for_scope.  */
+	  context_die = lookup_decl_die (TYPE_CONTEXT (type));
+	  need_pop = 0;
 	}
       else
 	{
@@ -17130,6 +17112,22 @@ is_redundant_typedef (const_tree decl)
   return 0;
 }
 
+/* Returns the DIE for a context.  */
+
+static inline dw_die_ref
+get_context_die (tree context)
+{
+  if (context)
+    {
+      /* Find die that represents this context.  */
+      if (TYPE_P (context))
+	return force_type_die (context);
+      else
+	return force_decl_die (context);
+    }
+  return comp_unit_die;
+}
+
 /* Returns the DIE for decl.  A DIE will always be returned.  */
 
 static dw_die_ref
@@ -17170,10 +17168,6 @@ force_decl_die (tree decl)
 
 	case NAMESPACE_DECL:
 	  dwarf2out_decl (decl);
-	  break;
-
-	case TRANSLATION_UNIT_DECL:
-	  decl_die = comp_unit_die;
 	  break;
 
 	default:

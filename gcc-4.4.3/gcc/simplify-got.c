@@ -72,6 +72,7 @@ struct got_access_info
   rtx symbol;         /* The global variable.  */
   rtx offset_reg;     /* Register contains the GOT entry offset.  */
   rtx address_reg;    /* Register contains the final global address.  */
+  rtx offset_insn;    /* The insn loads the offset.  */
   rtx load_insn;      /* The insn which loads the address from GOT.  */
 };
 
@@ -79,11 +80,7 @@ struct got_access_info
 static bool
 gate_handle_simplify_got (void)
 {
-  /* This pass breaks two Android benchmarks at run time.
-     http://b/issue?id=2749619.
-     We temporarily disable this pass as a work around.  */
-  /* return (optimize > 0) && targetm.got_access.get_pic_reg ();  */
-  return 0;
+  return (optimize > 0) && targetm.got_access.get_pic_reg ();
 }
 
 static unsigned int
@@ -121,8 +118,10 @@ rest_of_handle_simplify_got (void)
           if (!(set && (SET_DEST (set) == pic_reg)))
             {
               rtx offset_reg;
+              rtx offset_insn;
               rtx symbol = targetm.got_access.loaded_global_var (insn,
-                                                                 &offset_reg);
+                                                                 &offset_reg,
+                                                                 &offset_insn);
               if (symbol)
                 {
                   rtx* slot = (rtx*) htab_find_slot (var_table, symbol, INSERT);
@@ -134,6 +133,7 @@ rest_of_handle_simplify_got (void)
                   got_accesses[n_access].offset_reg = offset_reg;
                   got_accesses[n_access].address_reg = SET_DEST (set);
                   got_accesses[n_access].load_insn = insn;
+                  got_accesses[n_access].offset_insn = offset_insn;
                   n_access++;
                 }
               else
@@ -164,7 +164,8 @@ rest_of_handle_simplify_got (void)
     targetm.got_access.load_global_address (got_accesses[i].symbol,
                                             got_accesses[i].offset_reg,
                                             got_accesses[i].address_reg,
-                                            got_accesses[i].load_insn);
+                                            got_accesses[i].load_insn,
+                                            got_accesses[i].offset_insn);
 
   /* Since there is no usage of pic_reg now, we can remove it.  */
   if (use)

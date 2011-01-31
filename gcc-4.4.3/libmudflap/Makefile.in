@@ -253,9 +253,17 @@ ACLOCAL_AMFLAGS = -I .. -I ../config
 MAINT_CHARSET = latin1
 SUBDIRS = testsuite
 
+# Some stuff don't compile with SSP and FORTIFY_SOURCE
+enable_esp = @enable_esp@
+ifeq ($(enable_esp),yes)
+	NO_ESP_CFLAGS = -fno-stack-protector -U_FORTIFY_SOURCE
+else
+	NO_ESP_CFLAGS =
+endif
+
 # May be used by various substitution variables.
 gcc_version := $(shell cat $(top_srcdir)/../gcc/BASE-VER)
-AM_CFLAGS = -Wall $(SECTION_FLAGS)
+AM_CFLAGS = -Wall $(SECTION_FLAGS) $(NO_ESP_CFLAGS)
 @LIBMUDFLAPTH_FALSE@libmudflapth = 
 @LIBMUDFLAPTH_TRUE@libmudflapth = libmudflapth.la
 toolexeclib_LTLIBRARIES = libmudflap.la $(libmudflapth)

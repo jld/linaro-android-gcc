@@ -119,6 +119,9 @@ static char *da_file_name;
 static char *da_base_file_name;
 static char *main_input_file_name;
 
+/* Filename for the global pmu profile */
+static char pmu_profile_filename[] = "pmuprofile";
+
 /* Hash table of count data.  */
 static htab_t counts_hash = NULL;
 
@@ -149,6 +152,16 @@ static unsigned num_cpp_includes = 0;
 /* True if the current module has any asm statements.  */
 static bool has_asm_statement;
 
+/* extern const char * __gcov_pmu_profile_filename */
+static tree gcov_pmu_filename_decl = NULL_TREE;
+/* extern const char * __gcov_pmu_profile_options */
+static tree gcov_pmu_options_decl = NULL_TREE;
+/* extern gcov_unsigned_t  __gcov_pmu_top_n_address */
+static tree gcov_pmu_top_n_address_decl = NULL_TREE;
+
+/* To ensure that the above variables are initialized only once.  */
+static int pmu_profiling_initialized = 0;
+
 /* Forward declarations.  */
 static hashval_t htab_counts_entry_hash (const void *);
 static int htab_counts_entry_eq (const void *, const void *);
@@ -160,8 +173,10 @@ static tree build_ctr_info_type (void);
 static tree build_ctr_info_value (unsigned, tree);
 static tree build_gcov_info (void);
 static void create_coverage (void);
-static char * get_da_file_name (const char *);
 static char * xstrdup_mask_random (const char *);
+static void init_pmu_profiling (void);
+static bool profiling_enabled_p (void);
+
 
 /* Return the type node for gcov_type.  */
 
@@ -170,6 +185,15 @@ get_gcov_type (void)
 {
   return lang_hooks.types.type_for_size (GCOV_TYPE_SIZE, false);
 }
+
+/* Return the type node for gcov_float_t.  */
+
+tree
+get_gcov_float_t (void)
+{
+  return double_type_node;
+}
+
 
 /* Return the type node for gcov_unsigned_t.  */
 
@@ -745,16 +769,24 @@ get_coverage_counts_no_warn (struct function *f, unsigned counter,
 {
   counts_entry_t *entry, elt;
 
-  gcc_assert (flag_dyn_ipa);
+  gcc_assert (flag_dyn_ipa || flag_optimize_locality);
 
   /* No hash table, no counts.  */
   if (!counts_hash || !f)
     return NULL;
 
   elt.ident = FUNC_DECL_GLOBAL_ID (f);
-  elt.name =  NULL;
+
+  if (flag_dyn_ipa)
+    elt.name =  NULL;
+  else
+    elt.name = xstrdup_mask_random (IDENTIFIER_POINTER (
+        DECL_ASSEMBLER_NAME (current_function_decl)));
+
   elt.ctr = counter;
   entry = (counts_entry_t *) htab_find (counts_hash, &elt);
+  if (elt.name)
+    free (elt.name);
   if (!entry)
     return NULL;
 
@@ -1779,7 +1811,7 @@ create_coverage (void)
 
   no_coverage = 1; /* Disable any further coverage.  */
 
-  if (!prg_ctr_mask)
+  if (!prg_ctr_mask && !flag_pmu_profile_generate)
     return;
 
   t = build_gcov_info ();
@@ -1813,7 +1845,7 @@ create_coverage (void)
 
 /* Get the da file name, given base file name.  */
 
-static char *
+char *
 get_da_file_name (const char *base_file_name)
 {
   char *da_file_name;
@@ -1999,6 +2031,117 @@ coverage_init (const char *filename, const char* source_name)
 	read_counts_file (get_da_file_name (module_infos[i]->da_filename),
 			  module_infos[i]->ident);
     }
+
+  /* Define variables which are referenced at runtime by libgcov.  */
+  if (profiling_enabled_p ())
+  {
+    init_pmu_profiling ();
+    tree_init_instrumentation_sampling ();
+  }
+}
+
+/* Return True if any type of profiling is enabled which requires linking
+   in libgcov otherwise return False.  */
+
+static bool
+profiling_enabled_p (void)
+{
+  return flag_pmu_profile_generate || profile_arc_flag ||
+      flag_profile_generate_sampling || flag_test_coverage ||
+      flag_branch_probabilities || flag_profile_reusedist;
+}
+
+/* Construct variables for PMU profiling.
+   1) __gcov_pmu_profile_filename,
+   2) __gcov_pmu_profile_options,
+   3) __gcov_pmu_top_n_address.  */
+
+static void
+init_pmu_profiling (void)
+{
+  if (!pmu_profiling_initialized)
+    {
+      unsigned top_n_addr = PARAM_VALUE (PARAM_PMU_PROFILE_N_ADDRESS);
+      tree filename_ptr, options_ptr;
+
+      /* Construct an initializer for __gcov_pmu_profile_filename.  */
+      gcov_pmu_filename_decl =
+        build_decl (VAR_DECL,
+                    get_identifier ("__gcov_pmu_profile_filename"),
+                    get_const_string_type ());
+      TREE_PUBLIC (gcov_pmu_filename_decl) = 1;
+      DECL_ARTIFICIAL (gcov_pmu_filename_decl) = 1;
+      DECL_ONE_ONLY (gcov_pmu_filename_decl) = 1;
+      TREE_STATIC (gcov_pmu_filename_decl) = 1;
+
+      if (flag_pmu_profile_generate)
+        {
+          const char *filename = get_da_file_name (pmu_profile_filename);
+          int file_name_len;
+          tree filename_string;
+          file_name_len = strlen (filename);
+          filename_string = build_string (file_name_len + 1, filename);
+          TREE_TYPE (filename_string) = build_array_type
+            (char_type_node, build_index_type
+             (build_int_cst (NULL_TREE, file_name_len)));
+          filename_ptr = build1 (ADDR_EXPR, get_const_string_type (),
+                                 filename_string);
+        }
+      else
+        filename_ptr = null_pointer_node;
+
+      DECL_INITIAL (gcov_pmu_filename_decl) = filename_ptr;
+      assemble_variable (gcov_pmu_filename_decl, 0, 0, 0);
+
+      /* Construct an initializer for __gcov_pmu_profile_options.  */
+      gcov_pmu_options_decl =
+        build_decl (VAR_DECL,
+                    get_identifier ("__gcov_pmu_profile_options"),
+                    get_const_string_type ());
+      TREE_PUBLIC (gcov_pmu_options_decl) = 1;
+      DECL_ARTIFICIAL (gcov_pmu_options_decl) = 1;
+      DECL_ONE_ONLY (gcov_pmu_options_decl) = 1;
+      TREE_STATIC (gcov_pmu_options_decl) = 1;
+
+      /* If the flag is false we generate a null pointer to indicate
+         that we are not doing the pmu profiling.  */
+      if (flag_pmu_profile_generate)
+        {
+          const char *pmu_options = flag_pmu_profile_generate;
+          int pmu_options_len;
+          tree pmu_options_string;
+
+          pmu_options_len = strlen (pmu_options);
+          pmu_options_string = build_string (pmu_options_len + 1, pmu_options);
+          TREE_TYPE (pmu_options_string) = build_array_type
+            (char_type_node, build_index_type
+             (build_int_cst (NULL_TREE, pmu_options_len)));
+          options_ptr = build1 (ADDR_EXPR, get_const_string_type (),
+                                pmu_options_string);
+        }
+      else
+        options_ptr = null_pointer_node;
+
+      DECL_INITIAL (gcov_pmu_options_decl) = options_ptr;
+      assemble_variable (gcov_pmu_options_decl, 0, 0, 0);
+
+      /* Construct an initializer for __gcov_pmu_top_n_address.  We
+         don't need to guard this with the flag_pmu_profile generate
+         because the value of __gcov_pmu_top_n_address is ignored when
+         not doing profiling.  */
+      gcov_pmu_top_n_address_decl =
+        build_decl (VAR_DECL,
+                    get_identifier ("__gcov_pmu_top_n_address"),
+                    get_gcov_unsigned_t ());
+      TREE_PUBLIC (gcov_pmu_top_n_address_decl) = 1;
+      DECL_ARTIFICIAL (gcov_pmu_top_n_address_decl) = 1;
+      DECL_ONE_ONLY (gcov_pmu_top_n_address_decl) = 1;
+      TREE_STATIC (gcov_pmu_top_n_address_decl) = 1;
+      DECL_INITIAL (gcov_pmu_top_n_address_decl) =
+        build_int_cstu (get_gcov_unsigned_t (), top_n_addr);
+      assemble_variable (gcov_pmu_top_n_address_decl, 0, 0, 0);
+    }
+  pmu_profiling_initialized = 1;
 }
 
 /* Performs file-level cleanup.  Close graph file, generate coverage
@@ -2038,6 +2181,10 @@ str_list_append (struct str_list **head, struct str_list **tail, const char *s)
   *tail = e;
 }
 
+extern bool is_kernel_build;
+
+#define KERNEL_BUILD_PREDEF_STRING "__KERNEL__"
+
 /* Copies the macro def or undef CPP_DEF and saves the copy
    in a list. IS_DEF is a flag indicating if CPP_DEF represents
    a -D or -U.  */
@@ -2050,6 +2197,11 @@ coverage_note_define (const char *cpp_def, bool is_def)
   strcpy (s + 1, cpp_def);
   str_list_append (&cpp_defines_head, &cpp_defines_tail, s);
   num_cpp_defines++;
+
+   /* When -D__KERNEL__ is in the option list, we assume this is
+      compilation for Linux Kernel.  */
+  if (!strcmp(cpp_def, KERNEL_BUILD_PREDEF_STRING))
+    is_kernel_build = is_def;
 }
 
 /* Copies the -imacro/-include FILENAME and saves the copy in a list.  */
@@ -2130,5 +2282,19 @@ write_opts_to_asm (void)
     dw2_asm_output_nstring (lipo_cl_args[i], -1, NULL);
 }
 
-#include "gt-coverage.h"
+/* Check the command line OPTIONS passed to
+   -fpmu-profile-generate. Return 0 if the options are valid, non-zero
+   otherwise.  */
 
+int
+check_pmu_profile_options (const char *options)
+{
+  if (strcmp(options, "load-latency") &&
+      strcmp(options, "load-latency-verbose") &&
+      strcmp(options, "branch-mispredict") &&
+      strcmp(options, "branch-mispredict-verbose"))
+    return 1;
+  return 0;
+}
+
+#include "gt-coverage.h"

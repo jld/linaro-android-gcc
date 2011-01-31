@@ -1794,6 +1794,10 @@ gen_lsm_tmp_name (tree ref)
       lsm_tmp_name_add ("S");
       break;
 
+    case INTEGER_CST:
+      lsm_tmp_name_add ("C");
+      break;
+
     case RESULT_DECL:
       lsm_tmp_name_add ("R");
       break;

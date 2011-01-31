@@ -2350,7 +2350,7 @@ compute_rd_gen_kill_set (basic_block bb, int bb_ridx,
 static void
 initialize_data_flow_rd (lrs_region_p region)
 {
-  int i, n, nb, bit_first = 0, bit_last = -1, entry_rid;
+  int i, n, nb, bit_first = 0, bit_last = -1, entry_rid = 0;
   tree vvar; 
 
   region->vname_bit_pos_map = pointer_map_create ();
@@ -4150,7 +4150,7 @@ update_data_flow (gimple_stmt_iterator moved_stmt_gsi,
         = get_across_stmt_use_ref_set (prev_stmt, region);
   else
     {
-      int bidx;
+      int bidx = 0;
       basic_block bb = gimple_bb (moved_stmt);
       get_bb_index_in_region (bb, region, &bidx);
       live_across_prev
@@ -4542,7 +4542,7 @@ get_reaching_vdefs (gimple target_loc, bool is_after,
         }
       else
         {
-          int rid;
+          int rid = 0;
           basic_block bb = gimple_bb (target_loc);
           get_bb_index_in_region (bb, region, &rid);
           reaching_defs = get_bb_rd_out_set (rid, region);
@@ -4700,7 +4700,7 @@ check_down_motion_profitability (gimple target_loc,
       else
         {
           basic_block bb;
-          int rid;
+          int rid = 0;
           bb = gimple_bb (target_loc);
           get_bb_index_in_region (bb, region, &rid);
           live_ur_set = get_bb_use_ref_in_set (rid, region);

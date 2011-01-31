@@ -83,6 +83,7 @@ compilation is specified by a string called a "spec".  */
 #include "gcc.h"
 #include "flags.h"
 #include "opts.h"
+#include "esp.h" /* for --enable-esp support */
 
 /* By default there is no special suffix for target executables.  */
 /* FIXME: when autoconf is fixed, remove the host check - dj */
@@ -727,6 +728,10 @@ proper position among the other output files.  */
 # endif
 #endif
 
+/* Google-local http://b/2739909  */
+#ifndef LINK_RPATH_SPEC
+# define LINK_RPATH_SPEC ""
+#endif
 
 /* -u* was put back because both BSD and SysV seem to support it.  */
 /* %{static:} simply prevents an error message if the target machine
@@ -738,6 +743,7 @@ proper position among the other output files.  */
 #define LINK_COMMAND_SPEC "\
 %{!fsyntax-only:%{!c:%{!M:%{!MM:%{!E:%{!S:\
     %(linker) %l " LINK_PIE_SPEC \
+    LINK_RPATH_SPEC \
    "%{fuse-ld=gold:%{fuse-ld=bfd:%e-fuse-ld=gold and -fuse-ld=bfd may not be used together}} \
     %{fuse-ld=gold:-use-gold} \
     %{fuse-ld=bfd:-use-ld}" \
@@ -745,7 +751,7 @@ proper position among the other output files.  */
     %{s} %{t} %{u*} %{x} %{z} %{Z} %{!A:%{!nostdlib:%{!nostartfiles:%S}}}\
     %{static:} %{L*} %(mfwrap) %(link_libgcc) %o\
     %{fopenmp|ftree-parallelize-loops=*:%:include(libgomp.spec)%(link_gomp)} %(mflib)\
-    %{fprofile-arcs|fprofile-generate*|coverage:-lgcov}\
+    %{fprofile-arcs|fprofile-generate*|fpmu-profile-generate*|coverage:-lgcov}\
     %{!nostdlib:%{!nodefaultlibs:%(link_ssp) %(link_gcc_c_sequence)}}\
     %{!A:%{!nostdlib:%{!nostartfiles:%E}}} %{T*} }}}}}}"
 #endif
@@ -773,7 +779,9 @@ proper position among the other output files.  */
 
 static const char *asm_debug;
 static const char *cpp_spec = CPP_SPEC;
+#ifndef ENABLE_ESP
 static const char *cc1_spec = CC1_SPEC;
+#endif
 static const char *cc1plus_spec = CC1PLUS_SPEC;
 static const char *link_gcc_c_sequence_spec = LINK_GCC_C_SEQUENCE_SPEC;
 static const char *link_ssp_spec = LINK_SSP_SPEC;
@@ -832,7 +840,7 @@ static const char *cpp_unique_options =
 static const char *cpp_options =
 "%(cpp_unique_options) %1 %{m*} %{std*&ansi&trigraphs} %{W*&pedantic*} %{w}\
  %{f*} %{g*:%{!g0:%{g*} %{!fno-working-directory:-fworking-directory}}} %{O*}\
- %{undef} %{save-temps:-fpch-preprocess}";
+ %{undef} %{save-temps:-fpch-preprocess} %(esp_cpp_options)";
 
 /* This contains cpp options which are not passed when the preprocessor
    output will be used by another program.  */
@@ -1014,15 +1022,15 @@ static const struct compiler default_compilers[] =
 	  %{save-temps|traditional-cpp|no-integrated-cpp:%(trad_capable_cpp) \
 		%(cpp_options) -o %{save-temps:%b.i} %{!save-temps:%g.i} \n\
 		    cc1 -fpreprocessed %{save-temps:%b.i} %{!save-temps:%g.i} \
-			%(cc1_options)}\
+			%(cc1_options) %(espf_options)}\
 	  %{!save-temps:%{!traditional-cpp:%{!no-integrated-cpp:\
-		cc1 %(cpp_unique_options) %(cc1_options)}}}\
+		cc1 %(cpp_unique_options) %(cc1_options) %(esp_options)}}}\
           %{!fsyntax-only:%(invoke_as)}} \
       %{combine:\
 	  %{save-temps|traditional-cpp|no-integrated-cpp:%(trad_capable_cpp) \
 		%(cpp_options) -o %{save-temps:%b.i} %{!save-temps:%g.i}}\
 	  %{!save-temps:%{!traditional-cpp:%{!no-integrated-cpp:\
-		cc1 %(cpp_unique_options) %(cc1_options)}}\
+		cc1 %(cpp_unique_options) %(cc1_options) %(esp_options)}}\
                 %{!fsyntax-only:%(invoke_as)}}}}}}", 0, 1, 1},
   {"-",
    "%{!E:%e-E or -x required when input is from standard input}\
@@ -1045,7 +1053,7 @@ static const struct compiler default_compilers[] =
                     %W{o*:--output-pch=%*}%V}}}}}}", 0, 0, 0},
   {".i", "@cpp-output", 0, 1, 0},
   {"@cpp-output",
-   "%{!M:%{!MM:%{!E:cc1 -fpreprocessed %i %(cc1_options) %{!fsyntax-only:%(invoke_as)}}}}", 0, 1, 0},
+   "%{!M:%{!MM:%{!E:cc1 -fpreprocessed %i %(cc1_options) %(esp_options) %{!fsyntax-only:%(invoke_as)}}}}", 0, 1, 0},
   {".s", "@assembler", 0, 1, 0},
   {"@assembler",
    "%{!M:%{!MM:%{!E:%{!S:as %(asm_debug) %(asm_options) %i %A }}}}", 0, 1, 0},
@@ -1634,18 +1642,23 @@ static struct spec_list static_specs[] =
   INIT_STATIC_SPEC ("sysroot_hdrs_suffix_spec",	&sysroot_hdrs_suffix_spec),
 };
 
-#ifdef EXTRA_SPECS		/* additional specs needed */
+/* EXTRA_SPECS needs to be defined  */
+#ifndef EXTRA_SPECS
+#define EXTRA_SPECS
+#endif
+
+/* EXTRA_SPECS and ESP_EXTRA_SPECS add additional specs */
 /* Structure to keep track of just the first two args of a spec_list.
-   That is all that the EXTRA_SPECS macro gives us.  */
+   That is all that the EXTRA_SPECS and ESP_EXTRA_SPECS macro gives us.  */
 struct spec_list_1
 {
   const char *const name;
   const char *const ptr;
 };
 
-static const struct spec_list_1 extra_specs_1[] = { EXTRA_SPECS };
+/* ESP_EXTRA_SPECS before EXTRA_SPECS  */
+static const struct spec_list_1 extra_specs_1[] = { ESP_EXTRA_SPECS, EXTRA_SPECS };
 static struct spec_list *extra_specs = (struct spec_list *) 0;
-#endif
 
 /* List of dynamically allocates specs that have been defined so far.  */
 
@@ -1730,7 +1743,6 @@ init_spec (void)
   if (verbose_flag)
     notice ("Using built-in specs.\n");
 
-#ifdef EXTRA_SPECS
   extra_specs = XCNEWVEC (struct spec_list, ARRAY_SIZE (extra_specs_1));
 
   for (i = ARRAY_SIZE (extra_specs_1) - 1; i >= 0; i--)
@@ -1743,7 +1755,6 @@ init_spec (void)
       sl->ptr_spec = &sl->ptr;
       next = sl;
     }
-#endif
 
   for (i = ARRAY_SIZE (static_specs) - 1; i >= 0; i--)
     {
@@ -6535,6 +6546,12 @@ main (int argc, char **argv)
   if (gcc_exec_prefix)
     gcc_exec_prefix = concat (gcc_exec_prefix, spec_machine, dir_separator_str,
 			      spec_version, dir_separator_str, NULL);
+
+#ifdef ENABLE_ESP
+  /* Process ESP_COMMAND_OPTIONS_SPEC, adding any new options to the end
+     of the command line.  */
+  do_self_spec (esp_command_options_spec);
+#endif
 
   /* Now we have the specs.
      Set the `valid' bits for switches that match anything in any spec.  */

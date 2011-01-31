@@ -28,9 +28,11 @@ enum hist_type
   HIST_TYPE_POW2,	/* Histogram of power of 2 values.  */
   HIST_TYPE_SINGLE_VALUE, /* Tries to identify the value that is (almost)
 			   always constant.  */
+  HIST_TYPE_SINGLE_FLOAT_VALUE, /* Tries to identify the value that is (almost)
+                                   always constant.  */
   HIST_TYPE_CONST_DELTA, /* Tries to identify the (almost) always constant
 			   difference between two evaluations of a value.  */
-  HIST_TYPE_INDIR_CALL,   /* Tries to identify the function that is (almost) 
+  HIST_TYPE_INDIR_CALL,   /* Tries to identify the function that is (almost)
 			    called in indirect call */
   HIST_TYPE_AVERAGE,	/* Compute average value (sum of all values).  */
   HIST_TYPE_IOR,	/* Used to compute expected alignment.  */
@@ -97,6 +99,9 @@ struct profile_hooks {
   /* Insert code to find the most common value.  */
   void (*gen_one_value_profiler) (histogram_value, unsigned, unsigned);
 
+  /* Insert code to find the most common value.  */
+  void (*gen_one_float_value_profiler) (histogram_value, unsigned, unsigned);
+
   /* Insert code to find the most common value of a difference between two
      evaluations of an expression.  */
   void (*gen_const_delta_profiler) (histogram_value, unsigned, unsigned);
@@ -112,6 +117,12 @@ struct profile_hooks {
 
   /* Insert code to ior value of an expression.  */
   void (*gen_ior_profiler) (histogram_value, unsigned, unsigned);
+
+  /* Reuse distance profiler.  */
+  void (*reusedist_profiler) (void);
+
+  /* Reuse distance optimizer.  */
+  void (*optimize_reusedist) (void);
 };
 
 histogram_value gimple_histogram_value (struct function *, gimple);
@@ -127,6 +138,9 @@ void gimple_move_stmt_histograms (struct function *, gimple, gimple);
 void verify_histograms (void);
 void free_histograms (void);
 void stringop_block_profile (gimple, unsigned int *, HOST_WIDE_INT *);
+
+struct ffvpt_options_s
+ffvtp_process_options (const char *arg);
 
 /* In profile.c.  */
 extern void init_branch_prob (void);

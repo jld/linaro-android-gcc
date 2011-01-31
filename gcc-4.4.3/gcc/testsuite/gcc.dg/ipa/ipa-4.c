@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O3 -fipa-cp -fipa-cp-clone -fdump-ipa-cp"  } */
+/* { dg-options "-O3 -fipa-cp -fipa-cp-clone -fdump-ipa-cp --param inline-address-not-taken-function-emit-probability=100 --param inline-function-size-adjustment=0" } */
 /* { dg-skip-if "PR 25442" { "*-*-*" } { "-fpic" "-fPIC" } { "" } } */
 
 #include <stdio.h>

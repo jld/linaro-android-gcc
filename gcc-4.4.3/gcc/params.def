@@ -159,6 +159,32 @@ DEFPARAM (PARAM_MIN_COUNT_FRACTION_FOR_INLINE_COLD,
 	  "Minimum expected count in a hot callee from a cold callsite for it to be an inline canditate, as a fraction of maximum count.",
 	  10, 0, 0)
 
+DEFPARAM (PARAM_INLINE_PRIORITY_THRESHOLD,
+	  "inline-priority-threshold",
+	  "the maximum priority (growth/frequency) of a non-inline callsite to be inlined without -finline-functions",
+	  3500, 0, 0)
+
+DEFPARAM (PARAM_INLINE_FUNCTION_SIZE_ADJUSTMENT,
+	  "inline-function-size-adjustment",
+	  "Number of extra insns to use in inliner function size estimate to account for prologue, epilogue, and function alignment",
+	  20, 0, 0)
+
+DEFPARAM (PARAM_INLINE_ADDRESS_TAKEN_FUNCTION_EMIT_PROBABILITY,
+	  "inline-address-taken-function-emit-probability",
+	  "Probability that a function whose address is taken will be emitted in the final binary if all callsites in this unit are inlined",
+	  75, 0, 100)
+
+DEFPARAM (PARAM_INLINE_ADDRESS_NOT_TAKEN_FUNCTION_EMIT_PROBABILITY,
+	  "inline-address-not-taken-function-emit-probability",
+	  "Probability that a function whose address is not taken will be emitted in the final binary if all callsites in this unit are inlined",
+	  15, 0, 100)
+
+DEFPARAM (PARAM_INLINE_CONST_PARAM_ADJUSTMENT,
+	  "inline-const-param-adjustment",
+	  "Adjustment in percent to the inlining priority of a callsite for each constant parameter",
+	  0, 0, 0)
+
+
 /* Parameters controlling the growth of hot components of the call
    graph.  The size of a hot component (in internal gcc instructions)
    is the total of all instructions within hot basic blocks of the
@@ -252,7 +278,7 @@ DEFPARAM(PARAM_LARGE_STACK_FRAME,
 DEFPARAM(PARAM_STACK_FRAME_GROWTH,
 	 "large-stack-frame-growth",
 	 "Maximal stack frame growth due to inlining (in percent)",
-	 10, 0, 0)
+	 0, 0, 0)
 
 /* The GCSE optimization will be disabled if it would require
    significantly more memory than this value.  */
@@ -935,6 +961,13 @@ DEFPARAM (PARAM_MAX_LIPO_GROUP,
 	  "maximum module group size.",
           0, 0, 10000)
 
+/* In LIPO mode, stop processing any further auxiliary modules
+   if current memory consumption exceeds this limit (in kb).  */
+DEFPARAM (PARAM_MAX_LIPO_MEMORY,
+	  "max-lipo-mem",
+	  "don't import aux files if memory consumption exceeds this value",
+	  2400000, 0, 0)
+
 /* Used for debugging purpose. Tell the compiler to find
    the gcda file in the current directory.  */
 DEFPARAM (PARAM_GCOV_DEBUG,
@@ -971,6 +1004,31 @@ DEFPARAM (PARAM_SAMPLEFDO_INST_THRESH,
           "instructions sampled in it",
           5, 0, 1000)
 
+DEFPARAM (PARAM_REUSEDIST_MEAN_DIST_LARGE_THRESH,
+          "reusedist-mean-dist-large-thresh",
+          "Generate NTA stringops only if reusedist at least this size",
+          10000000, 0, 0)
+
+DEFPARAM (PARAM_REUSEDIST_MEAN_DIST_SMALL_THRESH,
+          "reusedist-mean-dist-small-thresh",
+          "Force temporal stringops if reusedist at most this size",
+          100000, 0, 0)
+
+DEFPARAM (PARAM_REUSEDIST_CALL_COUNT_THRESH,
+          "reusedist-call-count-thresh",
+          "Generate NTA stringops only if call count at least this large",
+          0, 0, 0)
+
+DEFPARAM (PARAM_REUSEDIST_MEMCPY_SIZE_THRESH,
+          "reusedist-memcpy-size-thresh",
+          "Generate memcpy-nta only if size at least this large",
+          4096, 0, 0)
+
+DEFPARAM (PARAM_REUSEDIST_MEMSET_SIZE_THRESH,
+          "reusedist-memset-size-thresh",
+          "Generate NTA memset only if size at least this large",
+          122880, 0, 0)
+
 /* When dumping the call graph only include nodes and edges with a
    count greater than this values.  */
 DEFPARAM (PARAM_CGRAPH_DUMP_COUNT_THRESHOLD,
@@ -978,6 +1036,35 @@ DEFPARAM (PARAM_CGRAPH_DUMP_COUNT_THRESHOLD,
 	  "minimum node count for inclusion in VCG call graph dump",
 	  0, 0, 0)
 
+/* Only output those call graph edges in .note.callgraph.text sections
+   whose count is greater than this value. */
+DEFPARAM (PARAM_NOTE_CGRAPH_SECTION_EDGE_THRESHOLD,
+	  "note-cgraph-section-edge-threshold",
+	  "minimum call graph edge count for inclusion in "
+          ".note.callgraph.text section",
+	  0, 0, 0)
+
+DEFPARAM (PARAM_PROFILE_GENERATE_SAMPLING_RATE,
+	  "profile-generate-sampling-rate",
+	  "sampling rate with -fprofile-generate-sampling",
+	  100, 0, 2000000000)
+
+DEFPARAM (PARAM_PMU_PROFILE_N_ADDRESS,
+	  "pmu_profile_n_addresses",
+	  "While doing PMU profiling symbolize this many top addresses.",
+	  50, 1, 10000)
+
+DEFPARAM (PARAM_NUMBER_OF_MVERSN_CLONES,
+          "num-mversn-clones",
+	  "maximum number of functions to be cloned while doing "
+          "multiversioning",
+	  4, 0, 100)
+
+DEFPARAM (PARAM_MVERSN_CLONE_CGRAPH_DEPTH,
+          "mversn-clone-depth",
+	  "maximum length of the call graph path to be cloned "
+          "while doing multiversioning",
+	  1, 0, 5)
 /*
 Local variables:
 mode:c

@@ -67,6 +67,7 @@ getpagesize (void)
   return (GNU_OUR_PAGESIZE);
 }
 #endif
+
 #else /* VMS */
 
 #if 0	/* older distributions of gcc-vms are missing <syidef.h> */

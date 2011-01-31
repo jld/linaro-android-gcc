@@ -300,7 +300,7 @@ i[34567]86-*-*)
 		       pmmintrin.h tmmintrin.h ammintrin.h smmintrin.h
 		       nmmintrin.h bmmintrin.h mmintrin-common.h
 		       wmmintrin.h immintrin.h x86intrin.h avxintrin.h 
-		       cross-stdarg.h"
+		       cross-stdarg.h lwpintrin.h"
 	;;
 x86_64-*-*)
 	cpu_type=i386
@@ -310,7 +310,7 @@ x86_64-*-*)
 		       pmmintrin.h tmmintrin.h ammintrin.h smmintrin.h
 		       nmmintrin.h bmmintrin.h mmintrin-common.h
 		       wmmintrin.h immintrin.h x86intrin.h avxintrin.h 
-		       cross-stdarg.h"
+		       cross-stdarg.h lwpintrin.h"
 	need_64bit_hwint=yes
 	;;
 ia64-*-*)
@@ -407,6 +407,9 @@ case ${target} in
 	;;
 esac
 
+# Common C libraries.
+tm_defines="$tm_defines LIBC_GLIBC=1 LIBC_UCLIBC=2 LIBC_BIONIC=3"
+
 # Common parts for widely ported systems.
 case ${target} in
 *-*-darwin*)
@@ -498,8 +501,6 @@ case ${target} in
     *-*-gnu*)
       tmake_file="$tmake_file t-gnu";;
   esac
-  # Common C libraries.
-  tm_defines="$tm_defines LIBC_GLIBC=1 LIBC_UCLIBC=2 LIBC_BIONIC=3"
   # glibc / uclibc / bionic switch.
   # uclibc and bionic aren't usable for GNU/Hurd and neither for GNU/k*BSD.
   case $target in
@@ -1117,7 +1118,7 @@ i[34567]86-*-linux* | i[34567]86-*-kfreebsd*-gnu | i[34567]86-*-knetbsd*-gnu | i
 			tmake_file="${tmake_file} i386/t-linux64"
 			need_64bit_hwint=yes
 			case X"${with_cpu}" in
-			Xgeneric|Xcore2|Xnocona|Xx86-64|Xamdfam10|Xbarcelona|Xk8|Xopteron|Xathlon64|Xathlon-fx)
+			Xgeneric|Xatom|Xcore2|Xnocona|Xx86-64|Xamdfam10|Xbarcelona|Xk8|Xopteron|Xathlon64|Xathlon-fx)
 				;;
 			X)
 				if test x$with_cpu_64 = x; then
@@ -1126,7 +1127,7 @@ i[34567]86-*-linux* | i[34567]86-*-kfreebsd*-gnu | i[34567]86-*-knetbsd*-gnu | i
 				;;
 			*)
 				echo "Unsupported CPU used in --with-cpu=$with_cpu, supported values:" 1>&2
-				echo "generic core2 nocona x86-64 amdfam10 barcelona k8 opteron athlon64 athlon-fx" 1>&2
+				echo "generic atom core2 nocona x86-64 amdfam10 barcelona k8 opteron athlon64 athlon-fx" 1>&2
 				exit 1
 				;;
 			esac
@@ -1237,7 +1238,7 @@ i[34567]86-*-solaris2*)
 		# libgcc/configure.ac instead.
 		need_64bit_hwint=yes
 		case X"${with_cpu}" in
-		Xgeneric|Xcore2|Xnocona|Xx86-64|Xamdfam10|Xbarcelona|Xk8|Xopteron|Xathlon64|Xathlon-fx)
+		Xgeneric|Xatom|Xcore2|Xnocona|Xx86-64|Xamdfam10|Xbarcelona|Xk8|Xopteron|Xathlon64|Xathlon-fx)
 			;;
 		X)
 			if test x$with_cpu_64 = x; then
@@ -1246,7 +1247,7 @@ i[34567]86-*-solaris2*)
 			;;
 		*)
 			echo "Unsupported CPU used in --with-cpu=$with_cpu, supported values:" 1>&2
-			echo "generic core2 nocona x86-64 amdfam10 barcelona k8 opteron athlon64 athlon-fx" 1>&2
+			echo "generic atom core2 nocona x86-64 amdfam10 barcelona k8 opteron athlon64 athlon-fx" 1>&2
 			exit 1
 			;;
 		esac
@@ -2624,6 +2625,27 @@ if test x$with_cpu = x ; then
   esac
 fi
 
+# Support --with-fpmath.
+if test x$with_fpmath != x; then
+  case ${target} in
+    i[34567]86-*-* | x86_64-*-*)
+      case ${with_fpmath} in
+      sse)
+	tm_file="${tm_file} i386/ssemath.h"
+	;;
+      *)
+	echo "Invalid --with-fpmath=$with_fpmath" 1>&2
+	exit 1
+	;;
+      esac
+      ;;
+    *)
+      echo "--with-fpmath isn't supported for $target." 1>&2
+      exit 1
+      ;;
+  esac
+fi
+
 # Similarly for --with-schedule.
 if test x$with_schedule = x; then
 	case ${target} in
@@ -2847,7 +2869,7 @@ case "${target}" in
 				esac
 				# OK
 				;;
-			"" | amdfam10 | barcelona | k8 | opteron | athlon64 | athlon-fx | nocona | core2 | generic)
+			"" | amdfam10 | barcelona | k8 | opteron | athlon64 | athlon-fx | nocona | core2 | atom | generic)
 				# OK
 				;;
 			*)

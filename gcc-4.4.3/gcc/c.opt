@@ -171,13 +171,17 @@ Wconversion
 C ObjC C++ ObjC++ Var(warn_conversion) Warning
 Warn for implicit type conversions that may change a value
 
-Wnull-conversion
-C ObjC C++ ObjC++ Var(warn_null_conversion) Init(-1) Warning
+Wconversion-null
+C++ ObjC++ Var(warn_conversion_null) Init(-1) Warning
 Warn about peculiar, but valid, conversions from/to NULL
 
 Wreal-conversion
 C ObjC C++ ObjC++ Var(warn_real_conversion) Init(-1) Warning
 Warn for implicit type conversions from real to integral values
+
+Wself-assign-non-pod
+C++ ObjC++ Var(warn_self_assign_non_pod) Init(0) Warning
+Warn when a variable of a non-POD type is assigned to itself
 
 Wsign-conversion
 C ObjC C++ ObjC++ Var(warn_sign_conversion) Init(-1)
@@ -345,7 +349,7 @@ C++ ObjC++ Var(warn_nonvdtor) Warning
 Warn about non-virtual destructors
 
 Wnonnull
-C ObjC Var(warn_nonnull) Warning
+C C++ ObjC ObjC++ Var(warn_nonnull) Warning
 Warn about NULL being passed to argument slots marked as requiring non-NULL
 
 Wnormalized=

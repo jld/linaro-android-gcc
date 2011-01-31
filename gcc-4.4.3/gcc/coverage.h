@@ -58,6 +58,7 @@ extern gcov_type *get_coverage_counts_no_warn (struct function *,
 
 extern struct cgraph_node * find_func_by_global_id (unsigned HOST_WIDE_INT gid);
 
+extern struct cgraph_node * find_func_by_name (const char *name);
 /* All the coverage counters are supposed to be allocated by the time
    coverage_end_function is called. However, direct-call counters are
    allocated after coverage_end_function has been called. This function
@@ -72,8 +73,18 @@ extern bool coverage_function_present (unsigned fn_ident);
 
 extern tree get_gcov_type (void);
 extern tree get_gcov_unsigned_t (void);
+extern tree get_gcov_float_t (void);
 
 /* Mark this module as containing asm statements.  */
 extern void coverage_has_asm_stmt (void);
+
+/* Get the da file name, given base file name.  */
+extern char * get_da_file_name (const char *base_file_name);
+
+/* Check if the specified options are valid for pmu profilig.  */
+extern int check_pmu_profile_options (const char *options);
+
+/* Defined in tree-profile.c.  */
+extern void tree_init_instrumentation_sampling (void);
 
 #endif

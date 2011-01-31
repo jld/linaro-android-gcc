@@ -280,6 +280,12 @@ vis_hide =
 gen-hide-list = echo > \$@
 endif
 
+# We add crtbeginTS.o to the EXTRA_PARTS list if enable_crtbeginTS = yes
+enable_libgcc_crtbeginTS = $(enable_crtbeginTS)
+ifeq ($(enable_libgcc_crtbeginTS),yes)
+EXTRA_PARTS += crtbeginTS.o
+endif
+
 ifneq ($(EXTRA_PARTS),)
   extra-parts = libgcc-extra-parts
   INSTALL_PARTS = $(EXTRA_PARTS)
@@ -729,10 +735,13 @@ $(libgcov-objects): %$(objext): $(gcc_srcdir)/libgcov.c
 dyn-ipa.o: %$(objext): $(gcc_srcdir)/libgcov.c
 	$(gcc_compile)  -c $(gcc_srcdir)/dyn-ipa.c
 
+pmu-profile.o: %$(objext): $(gcc_srcdir)/libgcov.c
+	$(gcc_compile)  -c $(gcc_srcdir)/pmu-profile.c
+
 
 # Static libraries.
 libgcc.a: $(libgcc-objects)
-libgcov.a: $(libgcov-objects) dyn-ipa$(objext)
+libgcov.a: $(libgcov-objects) dyn-ipa$(objext) pmu-profile$(objext)
 libunwind.a: $(libunwind-objects)
 libgcc_eh.a: $(libgcc-eh-objects)
 
@@ -834,6 +843,13 @@ crtendS$(objext): $(gcc_srcdir)/crtstuff.c
 crtbeginT.o: $(gcc_srcdir)/crtstuff.c
 	$(crt_compile) $(CRTSTUFF_T_CFLAGS) \
 	  -c $(gcc_srcdir)/crtstuff.c -DCRT_BEGIN -DCRTSTUFFT_O
+
+# This is a version of crtbegin for -static -fPIE links.
+ifeq ($(enable_libgcc_crtbeginTS),yes)
+crtbeginTS.o: $(gcc_srcdir)/crtstuff.c
+	$(crt_compile) $(CRTSTUFF_T_CFLAGS_S) \
+	  -c $(gcc_srcdir)/crtstuff.c -DCRT_BEGIN -DCRTSTUFFT_O -DCRTSTUFFS_O
+endif
 endif
 
 # Build extra startfiles in the libgcc directory.

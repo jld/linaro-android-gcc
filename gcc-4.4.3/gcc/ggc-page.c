@@ -2363,3 +2363,9 @@ ggc_pch_read (FILE *f, void *addr)
   /* Update the statistics.  */
   G.allocated = G.allocated_last_gc = offs - (char *)addr;
 }
+
+size_t
+ggc_total_allocated (void)
+{
+  return G.bytes_mapped;
+}

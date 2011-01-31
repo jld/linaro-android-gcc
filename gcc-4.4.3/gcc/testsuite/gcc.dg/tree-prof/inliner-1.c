@@ -1,4 +1,4 @@
-/* { dg-options "-O2 -fdump-tree-optimized" } */
+/* { dg-options "-O2 -fdump-tree-optimized --param inline-address-not-taken-function-emit-probability=100 --param inline-function-size-adjustment=0" } */
 int a;
 int b[100];
 void abort (void);

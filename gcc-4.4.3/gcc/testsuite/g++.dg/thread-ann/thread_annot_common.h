@@ -27,6 +27,11 @@
 #define SHARED_LOCKS_REQUIRED(...) \
   __attribute__ ((shared_locks_required(__VA_ARGS__)))
 #define NO_THREAD_SAFETY_ANALYSIS  __attribute__ ((no_thread_safety_analysis))
+#define IGNORE_READS_BEGIN   __attribute__ ((ignore_reads_begin))
+#define IGNORE_READS_END     __attribute__ ((ignore_reads_end))
+#define IGNORE_WRITES_BEGIN  __attribute__ ((ignore_writes_begin))
+#define IGNORE_WRITES_END    __attribute__ ((ignore_writes_end))
+#define UNPROTECTED_READ     __attribute__ ((unprotected_read))
 
 #else
 
@@ -48,6 +53,11 @@
 #define EXCLUSIVE_LOCKS_REQUIRED(...)
 #define SHARED_LOCKS_REQUIRED(...)
 #define NO_THREAD_SAFETY_ANALYSIS
+#define IGNORE_READS_BEGIN
+#define IGNORE_READS_END
+#define IGNORE_WRITES_BEGIN
+#define IGNORE_WRITES_END
+#define UNPROTECTED_READ
 
 #endif // defined(__GNUC__) && defined(__SUPPORT_TS_ANNOTATION__)
 
@@ -80,5 +90,42 @@ class SCOPED_LOCKABLE ReleasableMutexLock {
   ~ReleasableMutexLock() UNLOCK_FUNCTION();
   void Release() UNLOCK_FUNCTION();
 };
+
+void AnnotateIgnoreReadsBegin(const char *file, int line) IGNORE_READS_BEGIN;
+void AnnotateIgnoreReadsEnd(const char *file, int line) IGNORE_READS_END;
+void AnnotateIgnoreWritesBegin(const char *file, int line) IGNORE_WRITES_BEGIN;
+void AnnotateIgnoreWritesEnd(const char *file, int line) IGNORE_WRITES_END;
+
+#define ANNOTATE_IGNORE_READS_BEGIN() \
+  AnnotateIgnoreReadsBegin(__FILE__, __LINE__)
+
+#define ANNOTATE_IGNORE_READS_END() \
+  AnnotateIgnoreReadsEnd(__FILE__, __LINE__)
+
+#define ANNOTATE_IGNORE_WRITES_BEGIN() \
+  AnnotateIgnoreWritesBegin(__FILE__, __LINE__)
+
+#define ANNOTATE_IGNORE_WRITES_END() \
+  AnnotateIgnoreWritesEnd(__FILE__, __LINE__)
+
+#define ANNOTATE_IGNORE_READS_AND_WRITES_BEGIN() \
+  do {                                           \
+    ANNOTATE_IGNORE_READS_BEGIN();               \
+    ANNOTATE_IGNORE_WRITES_BEGIN();              \
+  }while(0)                                      \
+
+#define ANNOTATE_IGNORE_READS_AND_WRITES_END() \
+  do {                                         \
+    ANNOTATE_IGNORE_WRITES_END();              \
+    ANNOTATE_IGNORE_READS_END();               \
+  }while(0)                                    \
+
+template <class T>
+inline T ANNOTATE_UNPROTECTED_READ(const T &x) UNPROTECTED_READ {
+  ANNOTATE_IGNORE_READS_BEGIN();
+  T res = x;
+  ANNOTATE_IGNORE_READS_END();
+  return res;
+}
 
 #endif // THREAD_ANNOT_COMMON_H

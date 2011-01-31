@@ -1625,6 +1625,36 @@ set_ssa_val_to (tree from, tree to)
   return false;
 }
 
+/* Fix up references to VOP SSANAMEs defined by STMT
+   which is to be removed. This function does not
+   fix up references in VUSE/VDEFs which need to be
+   handled seperately.  */
+
+void
+fixup_vdef_ssa_val_refs (gimple stmt)
+{
+  struct voptype_d *vdefs;
+  tree var;
+  int i;
+
+  vdefs = gimple_vdef_ops (stmt);
+  while (vdefs)
+    {
+      tree def_nm;
+      tree prev_nm;
+
+      def_nm = VDEF_RESULT (vdefs);
+      prev_nm = VDEF_OP (vdefs, 0);
+
+      for (i = 0; VEC_iterate (tree, SSANAMES (cfun), i, var); i++)
+	{
+	  if (var && SSA_VAL (var) == def_nm)
+	    set_ssa_val_to (var, prev_nm);
+	}
+      vdefs = vdefs->next;
+    }
+}
+
 /* Set all definitions in STMT to value number to themselves.
    Return true if a value number changed. */
 

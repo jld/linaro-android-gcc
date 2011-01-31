@@ -6472,6 +6472,16 @@ cp_parser_question_colon_clause (cp_parser* parser, tree logical_or_expr)
                                    tf_warning_or_error);
 }
 
+/* A helpfer function to check if the given expression (EXPR) is of POD type.
+   Note that if the expression's type is NULL (e.g. when its type depends on
+   template parameters), we return false.  */
+
+static bool
+expr_is_pod (tree expr)
+{
+  return TREE_TYPE (expr) && pod_type_p (TREE_TYPE (expr));
+}
+
 /* Parse an assignment-expression.
 
    assignment-expression:
@@ -6529,8 +6539,12 @@ cp_parser_assignment_expression (cp_parser* parser, bool cast_p,
 		return error_mark_node;
 
               /* Check for and warn about self-assignment if -Wself-assign is
-                 enabled and the assignment operator is "=".  */
-              if (warn_self_assign && assignment_operator == NOP_EXPR)
+                 enabled and the assignment operator is "=".
+		 Checking for non-POD self-assignment will be performed only
+		 when -Wself-assign-non-pod is enabled. */
+              if (warn_self_assign
+		  && assignment_operator == NOP_EXPR
+		  && (warn_self_assign_non_pod || expr_is_pod (expr)))
                 check_for_self_assign (input_location, expr, rhs);
 
 	      /* Build the assignment expression.  */
@@ -10615,6 +10629,9 @@ cp_parser_template_argument_list (cp_parser* parser)
   parser->non_integral_constant_expression_p = saved_non_ice_p;
   parser->integral_constant_expression_p = saved_ice_p;
   parser->in_template_argument_list_p = saved_in_template_argument_list_p;
+#ifdef ENABLE_CHECKING
+  SET_NON_DEFAULT_TEMPLATE_ARGS_COUNT (vec, TREE_VEC_LENGTH (vec));
+#endif
   return vec;
 }
 
@@ -17895,6 +17912,35 @@ cp_parser_function_definition_from_specifiers_and_declarator
      scope of the function to perform the checks, since the function
      might be a friend.  */
   perform_deferred_access_checks ();
+
+  /* If the function definition is annotated with lock attributes with
+     arguments that are data members in the class, the parser would not be
+     able to bind those names to their FIELD_DECLs earlier when parsing the
+     attributes because the class context was not in scope at that time.
+     Now that we have entered the class context, try and bind and resolve
+     those identifiers.  */
+  if (attributes)
+    {
+      tree attr;
+      for (attr = attributes; attr; attr = TREE_CHAIN (attr))
+        {
+          tree arg;
+          if (!is_lock_attribute_with_args (TREE_PURPOSE (attr)))
+            continue;
+          for (arg = TREE_VALUE (attr); arg; arg = TREE_CHAIN (arg))
+            {
+              tree lock = TREE_VALUE (arg);
+              if (TREE_CODE (lock) == IDENTIFIER_NODE)
+                {
+                  tree lock_decl =
+                      cp_parser_lookup_name_simple (parser, lock,
+                                                    input_location);
+                  if (lock_decl && lock_decl != error_mark_node)
+                    TREE_VALUE (arg) = lock_decl;
+                }
+            }
+        }
+    }
 
   if (!success_p)
     {

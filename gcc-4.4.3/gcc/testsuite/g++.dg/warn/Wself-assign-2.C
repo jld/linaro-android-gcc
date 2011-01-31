@@ -18,9 +18,9 @@ template<typename T>
 T DoSomething(T y) {
   T a[5], *p;
   Bar<T> b;
-  b.x = b.x; // { dg-warning "assigned to itself" }
-  *p = *p; // { dg-warning "assigned to itself" }
-  a[2] = a[2]; // { dg-warning "assigned to itself" }
+  b.x = b.x;
+  *p = *p;
+  a[2] = a[2];
   return *p;
 }
 

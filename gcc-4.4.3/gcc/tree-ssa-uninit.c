@@ -215,7 +215,7 @@ find_control_equiv_block (basic_block bb)
 }
 
 #define MAX_NUM_CHAINS 8
-#define MAX_CHAIN_LEN 5
+#define MAX_CHAIN_LEN 8
 
 /* Computes the control dependence chains (paths of edges)
    for DEP_BB up to the dominating basic block BB (the head node of a
@@ -728,6 +728,160 @@ is_use_properly_guarded (gimple use_stmt,
                          sbitmap uninit_opnds,
                          struct pointer_set_t *visited_phis);
 
+/* A helper function for prune_uninit_phi_opnds_in_unrealizable_paths.
+   Returns true if FLAG_ARG is defined by another phi node, and
+   the I th operand of PHI is also defined by another phi in the same
+   basic block of FLAG_ARG def's bb; returns false otherwise. If it
+   returns true, the defining statements for the flag and phi arg
+   are stored in *FLAG_ARG_DEF and *PHI_ARG_DEF.  */
+
+static bool
+is_phi_arg_defined_by_phi (tree flag_arg, gimple phi, unsigned i,
+                           gimple *flag_arg_def, gimple *phi_arg_def)
+{
+  tree phi_arg;
+
+  if (TREE_CODE (flag_arg) != SSA_NAME)
+    return false;
+
+  *flag_arg_def = SSA_NAME_DEF_STMT (flag_arg);
+  if (gimple_code (*flag_arg_def) != GIMPLE_PHI)
+    return false;
+
+  phi_arg = gimple_phi_arg_def (phi, i);
+  if (TREE_CODE (phi_arg) != SSA_NAME)
+    return false;
+
+  *phi_arg_def = SSA_NAME_DEF_STMT (phi_arg);
+  if (gimple_code (*phi_arg_def) != GIMPLE_PHI)
+    return false;
+
+  if (gimple_bb (*phi_arg_def) != gimple_bb (*flag_arg_def))
+    return false;
+
+  return true;
+}
+
+/* Returns true if all uninitialized opnds are pruned. Returns false
+   otherwise. PHI is the phi node with uninitialized operands,
+   UNINIT_OPNDS is the bitmap of the uninitialize operand positions,
+   FLAG_DEF is the statement defining the flag guarding the use of the
+   PHI output, BOUNDARY_CST is the const value used in the predicate
+   associated with the flag, CMP_CODE is the comparison code used in
+   the predicate, VISITED_PHIS is the pointer set of phis visited, and
+   VISITED_FLAG_PHIS is the pointer to the pointer set of flag definitions
+   that are also phis.
+
+   Example scenario:
+
+   BB1:
+   flag_1 = phi <0, 1>                  // (1)
+   var_1  = phi <undef, some_val>
+
+
+   BB2:
+   flag_2 = phi <0,   flag_1, flag_1>   // (2)
+   var_2  = phi <undef, var_1, var_1>
+   if (flag_2 == 1)
+      goto BB3;
+
+   BB3:
+   use of var_2                         // (3)
+
+   Because some flag arg in (1) is not constant, if we do not look into the
+   flag phis recursively, it is conservatively treated as unknown and var_1
+   is thought to be flowed into use at (3). Since var_1 is potentially uninitialized
+   a false warning will be emitted. Checking recursively into (1), the compiler can
+   find out that only some_val (which is defined) can flow into (3) which is OK.  */
+
+static bool
+prune_uninit_phi_opnds_in_unrealizable_paths (
+    gimple phi, sbitmap uninit_opnds,
+    gimple flag_def, tree boundary_cst,
+    enum tree_code cmp_code,
+    struct pointer_set_t *visited_phis,
+    struct pointer_set_t **visited_flag_phis)
+{
+  sbitmap_iterator sbi;
+  unsigned i;
+
+  EXECUTE_IF_SET_IN_SBITMAP (uninit_opnds, 0, i, sbi)
+    {
+      tree flag_arg;
+
+      flag_arg = gimple_phi_arg_def (flag_def, i);
+
+      if (!is_gimple_constant (flag_arg))
+        {
+          gimple flag_arg_def, phi_arg_def;
+          sbitmap uninit_opnds_arg_phi;
+
+          if (!is_phi_arg_defined_by_phi (flag_arg,
+                                          phi, i,
+                                          &flag_arg_def,
+                                          &phi_arg_def))
+            return false;
+
+          if (!*visited_flag_phis)
+            *visited_flag_phis = pointer_set_create ();
+
+          if (pointer_set_insert (*visited_flag_phis, flag_arg_def))
+            return false;
+
+          /* Now recursively prune the uninitialized phi args.  */
+          uninit_opnds_arg_phi = compute_uninit_opnds_pos (phi_arg_def);
+          if (!prune_uninit_phi_opnds_in_unrealizable_paths (
+                  phi_arg_def, uninit_opnds_arg_phi,
+                  flag_arg_def, boundary_cst, cmp_code,
+                  visited_phis, visited_flag_phis))
+            {
+              sbitmap_free (uninit_opnds_arg_phi);
+              return false;
+            }
+          sbitmap_free (uninit_opnds_arg_phi);
+          pointer_set_delete (*visited_flag_phis, flag_arg_def);
+          continue;
+        }
+
+      /* Now check if the constant is in the guarded range.  */
+      if (is_value_included_in (flag_arg, boundary_cst, cmp_code))
+        {
+          tree opnd;
+          gimple opnd_def;
+
+          /* Now that we know that this undefined edge is not
+             pruned. If the operand is defined by another phi,
+             we can further prune the incoming edges of that
+             phi by checking the predicates of this operands.  */
+
+          opnd = gimple_phi_arg_def (phi, i);
+          opnd_def = SSA_NAME_DEF_STMT (opnd);
+          if (gimple_code (opnd_def) == GIMPLE_PHI)
+            {
+              edge opnd_edge;
+              sbitmap uninit_opnds2
+                  = compute_uninit_opnds_pos (opnd_def);
+              gcc_assert (!sbitmap_empty_p (uninit_opnds2));
+              opnd_edge = gimple_phi_arg_edge (phi, i);
+              if (!is_use_properly_guarded (phi,
+                                            opnd_edge->src,
+                                            opnd_def,
+                                            uninit_opnds2,
+                                            visited_phis))
+                {
+                  sbitmap_free (uninit_opnds2);
+                  return false;
+                }
+              sbitmap_free (uninit_opnds2);
+            }
+          else
+            return false;
+        }
+    }
+
+  return true;
+}
+
 /* A helper function that determines if the predicate set
    of the use is not overlapping with that of the uninit paths.
    The most common senario of guarded use is in Example 1:
@@ -816,7 +970,8 @@ use_pred_not_overlap_with_undef_path_pred (
   bool swap_cond = false;
   bool invert = false;
   VEC(use_pred_info_t, heap) *the_pred_chain;
-  sbitmap_iterator sbi;
+  struct pointer_set_t *visited_flag_phis = NULL;
+  bool all_pruned = false;
 
   gcc_assert (num_preds > 0);
   /* Find within the common prefix of multiple predicate chains
@@ -879,51 +1034,17 @@ use_pred_not_overlap_with_undef_path_pred (
   if (cmp_code == ERROR_MARK)
     return false;
 
-  EXECUTE_IF_SET_IN_SBITMAP (uninit_opnds, 0, i, sbi)
-    {
-      tree flag_arg;
+  all_pruned = prune_uninit_phi_opnds_in_unrealizable_paths (phi,
+                                                             uninit_opnds,
+                                                             flag_def,
+                                                             boundary_cst,
+                                                             cmp_code,
+                                                             visited_phis,
+                                                             &visited_flag_phis);
 
-      flag_arg = gimple_phi_arg_def (flag_def, i);
-      if (!is_gimple_constant (flag_arg))
-        return false;
-
-      /* Now check if the constant is in the guarded range.  */
-      if (is_value_included_in (flag_arg, boundary_cst, cmp_code))
-        {
-          tree opnd;
-          gimple opnd_def;
-
-          /* Now that we know that this undefined edge is not
-             pruned. If the operand is defined by another phi,
-             we can further prune the incoming edges of that
-             phi by checking the predicates of this operands.  */
-
-          opnd = gimple_phi_arg_def (phi, i);
-          opnd_def = SSA_NAME_DEF_STMT (opnd);
-          if (gimple_code (opnd_def) == GIMPLE_PHI)
-            {
-              edge opnd_edge;
-              sbitmap uninit_opnds2
-                  = compute_uninit_opnds_pos (opnd_def);
-              gcc_assert (!sbitmap_empty_p (uninit_opnds2));
-              opnd_edge = gimple_phi_arg_edge (phi, i);
-              if (!is_use_properly_guarded (phi,
-                                            opnd_edge->src,
-                                            opnd_def,
-                                            uninit_opnds2,
-                                            visited_phis))
-                {
-                  sbitmap_free (uninit_opnds2);
-                  return false;
-                }
-              sbitmap_free (uninit_opnds2);
-            }
-          else
-            return false;
-        }
-    }
-
-  return true;
+  if (visited_flag_phis)
+    pointer_set_destroy (visited_flag_phis);
+  return all_pruned;
 }
 
 /* Returns true if TC is AND or OR */
@@ -1639,7 +1760,7 @@ warn_uninitialized_phi (gimple phi, VEC(gimple, heap) **worklist,
     }
 
   uninit_op = gimple_phi_arg_def (phi, sbitmap_first_set_bit (uninit_opnds));
-  warn_uninit (uninit_op,
+  warn_uninit (OPT_Wmaybe_uninitialized, uninit_op,
                "%qD may be used uninitialized in this function",
                uninit_use_stmt);
 
@@ -1701,7 +1822,7 @@ execute_late_warn_uninitialized (void)
       cur_phi = VEC_pop (gimple, worklist);
       warn_uninitialized_phi (cur_phi, &worklist, added_to_worklist);
     }
-  
+
   VEC_free (gimple, heap, worklist);
   pointer_set_destroy (added_to_worklist);
   pointer_set_destroy (possibly_undefined_names);

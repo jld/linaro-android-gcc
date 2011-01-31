@@ -581,6 +581,18 @@ init_optimization_passes (void)
     }
   NEXT_PASS (pass_ipa_increase_alignment);
   NEXT_PASS (pass_ipa_matrix_reorg);
+  /* The ipa multiversion_dispatch pass must run before ipa_cp. Otherwise,
+     it must restore ipa_node_params data structures for the clones
+     set by ipa_cp. */
+  NEXT_PASS (pass_ipa_multiversion_dispatch);
+    {
+      struct opt_pass **p = &pass_ipa_multiversion_dispatch.pass.sub;
+      NEXT_PASS (pass_tree_convert_builtin_dispatch);
+      /* Rebuilding cgraph edges is necessary as the above passes change
+         the call graph.  Otherwise, future optimizations use the old
+	 call graph and make wrong decisions sometimes.*/
+      NEXT_PASS (pass_rebuild_cgraph_edges);
+    }
   NEXT_PASS (pass_ipa_cp);
   NEXT_PASS (pass_ipa_inline);
   NEXT_PASS (pass_ipa_reference);
@@ -594,6 +606,10 @@ init_optimization_passes (void)
      output to the assembler file.  */
   p = &all_passes;
   NEXT_PASS (pass_direct_call_profile);
+  /* Synthesize variables of union type whose fields are local variable
+     that can share stack slots. Do this before transformations that
+     perform code motion. */
+  NEXT_PASS (pass_stack_overlay);
   NEXT_PASS (pass_all_optimizations);
     {
       struct opt_pass **p = &pass_all_optimizations.pass.sub;
@@ -743,7 +759,6 @@ init_optimization_passes (void)
       NEXT_PASS (pass_cse);
       NEXT_PASS (pass_rtl_fwprop);
       NEXT_PASS (pass_gcse);
-      NEXT_PASS (pass_simplify_got);
       NEXT_PASS (pass_rtl_ifcvt);
       /* Perform loop optimizations.  It might be better to do them a bit
 	 sooner, but we want the profile feedback to work more
@@ -759,6 +774,7 @@ init_optimization_passes (void)
 	  NEXT_PASS (pass_rtl_loop_done);
 	  *p = NULL;
 	}
+      NEXT_PASS (pass_simplify_got);
       NEXT_PASS (pass_web);
       NEXT_PASS (pass_jump_bypass);
       NEXT_PASS (pass_cse2);

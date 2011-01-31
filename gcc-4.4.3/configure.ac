@@ -383,6 +383,25 @@ if test "${ENABLE_LIBADA}" != "yes" ; then
   noconfigdirs="$noconfigdirs gnattools"
 fi
 
+# Check whether --enable-esp was given and target have the support.
+AC_ARG_ENABLE([esp],
+[  --enable-esp
+			   Enable Stack protector, Position independent executable and
+			   as default if we have suppot for it when compiling
+			   and link with -z relro and -z now as default.
+			   Linux targets supported i*86, x86_64, ppc*, sparc* and arm*],
+[
+  case $target in
+    i?86*-*-linux* | x86_64*-*-linux* | ppc*-*-linux* | sparc*-*-linux* | arm*-*-linux*)
+      enable_esp=yes
+      ;;
+    *)
+      AC_MSG_ERROR([*** --enable-esp is not supported on this $target target.])
+      ;;
+  esac
+])
+AC_SUBST([enable_esp])
+
 AC_ARG_ENABLE(libssp,
 [  --enable-libssp         build libssp directory],
 ENABLE_LIBSSP=$enableval,
@@ -2890,6 +2909,9 @@ case $build in
       *) stage1_cflags="-g -J" ;;
     esac ;;
 esac
+if test x$enable_esp = xyes; then
+	stage1_cflags="$stage1_cflags -fno-stack-protector"
+fi
 
 # This is aimed to mimic bootstrap with a non-GCC compiler to catch problems.
 if test "$GCC" = yes; then

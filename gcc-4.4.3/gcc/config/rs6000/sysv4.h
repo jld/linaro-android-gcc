@@ -883,7 +883,12 @@ SVR4_ASM_SPEC \
 %{!mnewlib: %{pthread:-lpthread} %{shared:-lc} \
 %{!shared: %{profile:-lc_p} %{!profile:-lc}}}"
 
-#ifdef HAVE_LD_PIE
+#if defined (HAVE_LD_PIE) && defined (ENABLE_CRTBEGINTS)
+#define STARTFILE_LINUX_SPEC "\
+%{!shared: %{pg|p|profile:gcrt1.o%s;pie:Scrt1.o%s;:crt1.o%s}} \
+%{mnewlib:ecrti.o%s;:crti.o%s} \
+%{static:%{pie:crtbeginTS.o%s;:crtbeginT.o%s}} %{!static:%{shared|pie:crtbeginS.o%s;:crtbegin.o%s}}"
+#elif defined (HAVE_LD_PIE) && ! defined (ENABLE_CRTBEGINTS)
 #define	STARTFILE_LINUX_SPEC "\
 %{!shared: %{pg|p|profile:gcrt1.o%s;pie:Scrt1.o%s;:crt1.o%s}} \
 %{mnewlib:ecrti.o%s;:crti.o%s} \

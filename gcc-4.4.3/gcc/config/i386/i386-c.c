@@ -119,6 +119,10 @@ ix86_target_macros_internal (int isa_flag,
       def_or_undef (parse_in, "__core2");
       def_or_undef (parse_in, "__core2__");
       break;
+    case PROCESSOR_ATOM:
+      def_or_undef (parse_in, "__atom");
+      def_or_undef (parse_in, "__atom__");
+      break;
     /* use PROCESSOR_max to not set/unset the arch macro.  */
     case PROCESSOR_max:
       break;
@@ -187,6 +191,9 @@ ix86_target_macros_internal (int isa_flag,
     case PROCESSOR_CORE2:
       def_or_undef (parse_in, "__tune_core2__");
       break;
+    case PROCESSOR_ATOM:
+      def_or_undef (parse_in, "__tune_atom__");
+      break;
     case PROCESSOR_GENERIC32:
     case PROCESSOR_GENERIC64:
       break;
@@ -225,6 +232,8 @@ ix86_target_macros_internal (int isa_flag,
     def_or_undef (parse_in, "__SSE4A__");
   if (isa_flag & OPTION_MASK_ISA_SSE5)
     def_or_undef (parse_in, "__SSE5__");
+  if (isa_flag & OPTION_MASK_ISA_LWP)
+    def_or_undef (parse_in, "__LWP__");
   if ((fpmath & FPMATH_SSE) && (isa_flag & OPTION_MASK_ISA_SSE))
     def_or_undef (parse_in, "__SSE_MATH__");
   if ((fpmath & FPMATH_SSE) && (isa_flag & OPTION_MASK_ISA_SSE2))

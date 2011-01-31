@@ -1308,9 +1308,9 @@ setup_prohibited_mode_move_regs (void)
 	{
 	  if (! HARD_REGNO_MODE_OK (j, i))
 	    continue;
-	  SET_REGNO (test_reg1, j);
+	  SET_REGNO_RAW (test_reg1, j);
 	  PUT_MODE (test_reg1, i);
-	  SET_REGNO (test_reg2, j);
+	  SET_REGNO_RAW (test_reg2, j);
 	  PUT_MODE (test_reg2, i);
 	  INSN_CODE (move_insn) = -1;
 	  recog_memoized (move_insn);

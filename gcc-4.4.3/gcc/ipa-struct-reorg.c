@@ -1113,7 +1113,7 @@ create_new_field_access (struct field_access_site *f_acc,
 {
   tree new_type = field.field_mapping;
   gimple new_stmt;
-  tree size_res;
+  tree size_res = NULL;
   gimple mult_stmt;
   gimple cast_stmt;
   tree cast_res = NULL;

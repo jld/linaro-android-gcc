@@ -232,6 +232,10 @@ mtune=
 Target RejectNegative Joined Var(ix86_tune_string)
 Schedule code for given CPU
 
+mabi=
+Target RejectNegative Joined Var(ix86_abi_string)
+Generate code that conforms to the given ABI
+
 mveclibabi=
 Target RejectNegative Joined Var(ix86_veclibabi_string)
 Vector library ABI to use
@@ -323,6 +327,10 @@ msse5
 Target Report Mask(ISA_SSE5) Var(ix86_isa_flags) VarExists Save
 Support SSE5 built-in functions and code generation
 
+mlwp
+Target Report Mask(ISA_LWP) Var(ix86_isa_flags) VarExists Save
+Support LWP built-in functions and code generation 
+
 mabm
 Target Report Mask(ISA_ABM) Var(ix86_isa_flags) VarExists Save
 Support code generation of Advanced Bit Manipulation (ABM) instructions.
@@ -338,6 +346,10 @@ Support code generation of cmpxchg16b instruction.
 msahf
 Target Report Mask(ISA_SAHF) Var(ix86_isa_flags) VarExists Save
 Support code generation of sahf instruction in 64bit x86-64 code.
+
+mmovbe
+Target Report Mask(ISA_MOVBE) Var(ix86_isa_flags) VarExists Save
+Support code generation of movbe instruction.
 
 maes
 Target Report Mask(ISA_AES) Var(ix86_isa_flags) VarExists Save

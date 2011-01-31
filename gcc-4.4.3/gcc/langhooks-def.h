@@ -156,6 +156,7 @@ extern void lhd_omp_firstprivatize_type_sizes (struct gimplify_omp_ctx *,
 #define LANG_HOOKS_DECL_IS_BASE_FIELD lhd_do_nothing_t_return_bool
 #define LANG_HOOKS_DECL_IS_CONSTRUCTOR lhd_do_nothing_t_return_bool
 #define LANG_HOOKS_DECL_IS_DESTRUCTOR lhd_do_nothing_t_return_bool
+#define LANG_HOOKS_DECL_IS_CONST_MEMBER_FUNC lhd_do_nothing_t_return_int
 
 /* Tree dump hooks.  */
 extern bool lhd_tree_dump_dump_tree (void *, tree);
@@ -330,6 +331,7 @@ extern tree lhd_make_node (enum tree_code);
   LANG_HOOKS_DECL_IS_BASE_FIELD, \
   LANG_HOOKS_DECL_IS_CONSTRUCTOR, \
   LANG_HOOKS_DECL_IS_DESTRUCTOR, \
+  LANG_HOOKS_DECL_IS_CONST_MEMBER_FUNC, \
   LANG_HOOKS_BUILTIN_FUNCTION, \
   LANG_HOOKS_BUILTIN_FUNCTION_EXT_SCOPE, \
   LANG_HOOKS_USER_CONV_FUNCTION, \

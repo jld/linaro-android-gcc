@@ -195,6 +195,8 @@ static conversion *direct_reference_binding (tree, conversion *);
 static bool promoted_arithmetic_type_p (tree);
 static conversion *conditional_conversion (tree, tree);
 static char *name_as_c_string (tree, tree, bool *);
+static void find_const_memfunc_with_identical_prototype (tree,
+							 struct z_candidate *);
 static tree call_builtin_trap (void);
 static tree prep_operand (tree);
 static void add_candidates (tree, tree, tree, bool, tree, tree,
@@ -4159,7 +4161,20 @@ build_new_op (enum tree_code code, int flags, tree arg1, tree arg2, tree arg3,
 	  if (resolve_args (arglist) == error_mark_node)
 	    result = error_mark_node;
 	  else
-	    result = build_over_call (cand, LOOKUP_NORMAL, complain);
+            {
+              result = build_over_call (cand, LOOKUP_NORMAL, complain);
+	      /* If thread safety check is enabled and FN is not a const
+		 member function, try to see if there is a const overload in
+		 the candidates list (if we haven't done so already).  */
+	      if (warn_thread_safety
+                  && DECL_FUNCTION_MEMBER_P (cand->fn)
+		  && !DECL_CONST_MEMFUNC_P (cand->fn)
+		  && (!DECL_ATTRIBUTES (cand->fn)
+                      || !lookup_attribute ("has_const_overload",
+                                            DECL_ATTRIBUTES (cand->fn))))
+		find_const_memfunc_with_identical_prototype (cand->fn,
+                                                             candidates);
+            }
 	}
       else
 	{
@@ -4546,21 +4561,21 @@ conversion_null_warnings (tree totype, tree expr, tree fn, int argnum)
   if (expr == null_node && TREE_CODE (t) != BOOLEAN_TYPE && ARITHMETIC_TYPE_P (t))
     {
       if (fn)
-	warning (OPT_Wnull_conversion, "passing NULL to non-pointer argument %P of %qD",
+	warning (OPT_Wconversion_null, "passing NULL to non-pointer argument %P of %qD",
 		 argnum, fn);
       else
-	warning (OPT_Wnull_conversion, "converting to non-pointer type %qT from NULL", t);
+	warning (OPT_Wconversion_null, "converting to non-pointer type %qT from NULL", t);
     }
 
   /* Issue warnings if "false" is converted to a NULL pointer */
   else if (expr == boolean_false_node && POINTER_TYPE_P (t))
     {
       if (fn)
-        warning (OPT_Wnull_conversion,
+        warning (OPT_Wconversion_null,
                  "converting %<false%> to pointer type for argument %P of %qD",
                  argnum, fn);
       else
-        warning (OPT_Wnull_conversion, "converting %<false%> to pointer type");
+        warning (OPT_Wconversion_null, "converting %<false%> to pointer type");
     }
 }
 
@@ -5882,6 +5897,53 @@ name_as_c_string (tree name, tree type, bool *free_p)
   return pretty_name;
 }
 
+/* Given a decl FN which is a non-const member function, try to find if
+   there is another candidate that is a const member function with the same
+   prototype (i.e. parameter list) as FN. And if found, attach an internal
+   attribute "has_const_overload" to FN.  */
+
+static void
+find_const_memfunc_with_identical_prototype (tree fn,
+					     struct z_candidate *candidates)
+{
+  bool find_const_overload = false;
+  struct z_candidate *cand;
+
+  for (cand = candidates; cand; cand = cand->next)
+    {
+      tree candfunc = cand->fn;
+      tree t1, t2;
+
+      /* candfunc (or cand->fn) can be an IDENTIFIER_NODE if the candidate
+         is a builtin (see the add_candidate call in build_builtin_candidate).
+         Since it's not a user-defined overload, just skip it.  */
+      if (TREE_CODE (candfunc) != FUNCTION_DECL)
+        continue;
+
+      /* Skip FN itself and candidates that are not const.  */
+      if (candfunc == fn || !DECL_CONST_MEMFUNC_P (candfunc))
+	continue;
+
+      /* Compare the parameter lists of FN and CANDFUNC.  */
+      for (t1 = TREE_CHAIN (TYPE_ARG_TYPES (TREE_TYPE (fn))),
+	     t2 = TREE_CHAIN (TYPE_ARG_TYPES (TREE_TYPE (candfunc)));
+	   t1 && t2;
+	   t1 = TREE_CHAIN (t1), t2 = TREE_CHAIN (t2))
+	if (t1 != t2)
+	  break;
+
+      if (!t1 && !t2)
+	{
+	  find_const_overload = true;
+	  break;
+	}
+    }
+
+  if (find_const_overload)
+    DECL_ATTRIBUTES (fn) = tree_cons (get_identifier ("has_const_overload"),
+				      NULL_TREE, DECL_ATTRIBUTES (fn));
+}
+
 /* Build a call to "INSTANCE.FN (ARGS)".  If FN_P is non-NULL, it will
    be set, upon return, to the function called.  */
 
@@ -6152,6 +6214,15 @@ build_new_method_call (tree instance, tree fns, tree args,
 		   "operator delete(~X(f()))" (rather than generating
 		   "t = f(), ~X(t), operator delete (t)").  */
 		call = build_nop (void_type_node, call);
+	      /* If thread safety check is enabled and FN is not a const
+		 member function, try to see if there is a const overload in
+		 the candidates list (if we haven't done so already).  */
+	      if (warn_thread_safety
+		  && !DECL_CONST_MEMFUNC_P (fn)
+		  && (!DECL_ATTRIBUTES (fn)
+                      || !lookup_attribute ("has_const_overload",
+                                            DECL_ATTRIBUTES (fn))))
+		find_const_memfunc_with_identical_prototype (fn, candidates);
 	    }
 	}
     }

@@ -9,6 +9,8 @@ ACX_NONCANONICAL_TARGET
 
 AM_INIT_AUTOMAKE
 
+AC_SUBST([enable_esp])
+
 AC_MSG_CHECKING([for --enable-version-specific-runtime-libs])
 AC_ARG_ENABLE(version-specific-runtime-libs,
 [  --enable-version-specific-runtime-libs    Specify that runtime libraries should be installed in a compiler-specific directory ],

@@ -245,16 +245,16 @@ Objective-C and Objective-C++ Dialects}.
 -Wno-int-to-pointer-cast -Wno-invalid-offsetof @gol
 -Winvalid-pch -Wlarger-than=@var{len}  -Wunsafe-loop-optimizations @gol
 -Wlogical-op -Wlong-long @gol
--Wmain  -Wmissing-braces  -Wmissing-field-initializers @gol
+-Wmain -Wmaybe-uninitialized -Wmissing-braces  -Wmissing-field-initializers @gol
 -Wmissing-format-attribute  -Wmissing-include-dirs @gol
 -Wmissing-noreturn  -Wno-mudflap @gol
--Wno-multichar  -Wnonnull  -Wno-overflow -Wnull-conversion @gol
+-Wno-multichar  -Wnonnull  -Wno-overflow -Wconversion-null @gol
 -Woverlength-strings  -Wpacked  -Wpacked-bitfield-compat  -Wpadded @gol
 -Wparentheses  -Wpedantic-ms-format -Wno-pedantic-ms-format @gol
 -Wpointer-arith  -Wno-pointer-to-int-cast @gol
 -Wreal-conversion -Wredundant-decls @gol
--Wreturn-type  -Wripa-opt-mismatch -Wself-assign -Wsequence-point @gol
--Wshadow -Wshadow-compatible-local -Wshadow-local @gol
+-Wreturn-type  -Wripa-opt-mismatch -Wself-assign -Wself-assign-non-pod @gol
+-Wsequence-point -Wshadow -Wshadow-compatible-local -Wshadow-local @gol
 -Wsign-compare  -Wsign-conversion  -Wstack-protector @gol
 -Wstrict-aliasing -Wstrict-aliasing=n @gol
 -Wstrict-overflow -Wstrict-overflow=@var{n} @gol
@@ -329,13 +329,15 @@ Objective-C and Objective-C++ Dialects}.
 -falign-labels[=@var{n}] -falign-loops[=@var{n}] -fassociative-math @gol
 -fauto-inc-dec -fbranch-probabilities -fbranch-target-load-optimize @gol
 -fbranch-target-load-optimize2 -fbtr-bb-exclusive -fcaller-saves @gol
--fcheck-data-deps -fconserve-stack -fcprop-registers -fcrossjumping @gol
+-fcgraph-section -fcheck-data-deps @gol
+-fconserve-stack -fcprop-registers -fcrossjumping @gol
 -fcse-follow-jumps -fcse-skip-blocks -fcx-fortran-rules -fcx-limited-range @gol
 -fdata-sections -fdce -fdce @gol
 -fdelayed-branch -fdelete-null-pointer-checks -fdse -fdse @gol
 -fearly-inlining -fexpensive-optimizations -ffast-math @gol
 -ffinite-math-only -ffloat-store -fforward-propagate @gol
--ffunction-sections -fgcse -fgcse-after-reload -fgcse-las -fgcse-lm @gol
+-ffunction-sections -ffvpt -ffvpt-functions=@var{ffvptfunctions} -fgcse @gol
+-fgcse-after-reload -fgcse-las -fgcse-lm @gol
 -fgcse-sm -fif-conversion -fif-conversion2 -findirect-inlining @gol
 -finline-functions -finline-functions-called-once -finline-limit=@var{n} @gol
 -finline-small-functions -fipa-cp -fipa-cp-clone -fipa-matrix-reorg -fipa-pta @gol 
@@ -355,14 +357,16 @@ Objective-C and Objective-C++ Dialects}.
 -fomit-frame-pointer -foptimize-register-move -foptimize-sibling-calls @gol
 -fpeel-loops -fpredictive-commoning -fprefetch-loop-arrays @gol
 -fprofile-correction -fprofile-dir=@var{path} -fprofile-generate @gol
--fprofile-generate=@var{path} @gol
+-fprofile-generate=@var{path} -fprofile-generate-sampling @gol
 -fprofile-use -fprofile-use=@var{path} -fprofile-values @gol
+-fpmu-profile-generate=@var{pmuoption} @gol
+-fpmu-profile-use=@var{pmuoption} @gol
 -freciprocal-math -fregmove -frename-registers -freorder-blocks @gol
 -freorder-blocks-and-partition -freorder-functions @gol
 -frerun-cse-after-loop -freschedule-modulo-scheduled-loops @gol
--fripa -fripa-disallow-asm-modules @gol
--fripa-disallow-opt-mismatch -fripa-verbose -frounding-math @gol
--fsample-profile -fsample-profile-aggregate-using @gol
+-fripa -fripa-disallow-asm-modules -fripa-disallow-opt-mismatch @gol
+-fripa-no-promote-always-inline-func -fripa-verbose @gol
+-frounding-math -fsample-profile -fsample-profile-aggregate-using @gol
 -fsample-profile-use-entry -fsched2-use-superblocks @gol
 -fsched2-use-traces -fsched-spec-load -fsched-spec-load-dangerous @gol
 -fsched-stalled-insns-dep[=@var{n}] -fsched-stalled-insns[=@var{n}] @gol
@@ -583,17 +587,17 @@ Objective-C and Objective-C++ Dialects}.
 -mno-wide-multiply  -mrtd  -malign-double @gol
 -mpreferred-stack-boundary=@var{num}
 -mincoming-stack-boundary=@var{num}
--mcld -mcx16 -msahf -mrecip @gol
+-mcld -mcx16 -msahf -mmovbe -mrecip @gol
 -mmmx  -msse  -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -msse4 -mavx @gol
 -maes -mpclmul @gol
--msse4a -m3dnow -mpopcnt -mabm -msse5 @gol
+-msse4a -m3dnow -mpopcnt -mabm -msse5 -mlwp @gol
 -mthreads  -mno-align-stringops  -minline-all-stringops @gol
 -minline-stringops-dynamically -minline-compares @gol
 -mstringop-strategy=@var{alg} -mpush-args  -maccumulate-outgoing-args @gol
 -m128bit-long-double -m96bit-long-double -mregparm=@var{num} -msseregparm @gol
 -mveclibabi=@var{type} -mpc32 -mpc64 -mpc80 -mstackrealign @gol
 -momit-leaf-frame-pointer  -mno-red-zone -mno-tls-direct-seg-refs @gol
--mcmodel=@var{code-model} @gol
+-mcmodel=@var{code-model} -mabi=@var{name} @gol
 -m32  -m64 -mlarge-data-threshold=@var{num} @gol
 -mfused-madd -mno-fused-madd -msse2avx}
 
@@ -2786,6 +2790,7 @@ Options} and @ref{Objective-C and Objective-C++ Dialect Options}.
 -Wcomment  @gol
 -Wformat   @gol
 -Wmain @r{(only for C/ObjC and unless} @option{-ffreestanding}@r{)}  @gol
+-Wmaybe-uninitialized @gol
 -Wmissing-braces  @gol
 -Wnonnull  @gol
 -Wparentheses  @gol
@@ -2834,6 +2839,7 @@ name is still supported, but the newer name is more descriptive.)
 -Wsign-compare  @gol
 -Wtype-limits  @gol
 -Wuninitialized  @gol
+-Wmaybe-uninitialized @gol
 -Wunused-parameter @r{(only with} @option{-Wunused} @r{or} @option{-Wall}@r{)}  @gol
 }
 
@@ -2978,7 +2984,7 @@ Enable @option{-Wformat} plus format checks not included in
 @option{-Wformat}.  Currently equivalent to @samp{-Wformat
 -Wformat-nonliteral -Wformat-security -Wformat-y2k}.
 
-@item -Wnonnull @r{(C and Objective-C only)}
+@item -Wnonnull @r{(C, C++, Objective-C, and Objective-C++ only)}
 @opindex Wnonnull
 @opindex Wno-nonnull
 Warn about passing a null pointer for arguments marked as
@@ -3193,12 +3199,22 @@ void func()
 @end group
 @end smallexample
 
+In C++ it will not warn on self-assignment of non-POD variables unless
+@option{-Wself-assign-non-pod} is also enabled.
+
+@item -Wself-assign-non-pod
+@opindex Wself-assign-non-pod
+@opindex Wno-self-assign-non-pod
+Warn about self-assignment of non-POD variables. This is a C++-specific
+warning and only effective when @option{-Wself-assign} is enabled.
+
 There are cases where self-assignment might be intentional. For example,
-a C++ programmers might write code to test whether an overloaded
+a C++ programmer might write code to test whether an overloaded
 @code{operator=} works when the same object is assigned to itself.
-One way to work around the self-assign warning in such case is using
-the functional form @code{object.operator=(object)} instead of the
-assignment form @code{object = object}, as shown in the following example.
+One way to work around the self-assign warning in such cases when this flag
+is enabled is using the functional form @code{object.operator=(object)}
+instead of the assignment form @code{object = object}, as shown in the
+following example.
 
 @smallexample
 @group
@@ -3358,8 +3374,15 @@ to compute a value that itself is never used, because such
 computations may be deleted by data flow analysis before the warnings
 are printed.
 
-These warnings are made optional because GCC is not smart
-enough to see all the reasons why the code might be correct
+@item -Wmaybe-uninitialized
+@opindex Wmaybe-uninitialized
+@opindex Wno-maybe-uninitialized
+For an automatic variable, if there exists a path from the function
+entry to a use of the variable that is initialized, but there exist
+some other paths the variable is not initialized, the compiler will
+emit a warning if it can not prove the uninitialized paths do not
+happen at runtime. These warnings are made optional because GCC is 
+not smart enough to see all the reasons why the code might be correct
 despite appearing to have an error.  Here is one example of how
 this can happen:
 
@@ -3382,20 +3405,9 @@ this can happen:
 
 @noindent
 If the value of @code{y} is always 1, 2 or 3, then @code{x} is
-always initialized, but GCC doesn't know this.  Here is
-another common case:
-
-@smallexample
-@{
-  int save_y;
-  if (change_y) save_y = y, y = new_y;
-  @dots{}
-  if (change_y) y = save_y;
-@}
-@end smallexample
-
-@noindent
-This has no bug because @code{save_y} is used only if it is set.
+always initialized, but GCC doesn't know this. To suppress the
+warning, the user needs to provide a default case with assert(0) or
+similar code.
 
 @cindex @code{longjmp} warnings
 This option also warns when a non-volatile automatic variable might be
@@ -3857,9 +3869,9 @@ to them. Warnings about conversions between signed and unsigned
 integers are disabled by default in C++ unless
 @option{-Wsign-conversion} is explicitly enabled.
 
-@item -Wnull-conversion
-@opindex Wnull-conversion
-@opindex Wno-null-conversion
+@item -Wconversion-null
+@opindex Wconversion-null
+@opindex Wno-conversion-null
 Warn about peculiar, but valid, conversions from/to @code{NULL}.
 This includes converting @code{NULL} to non-pointer type and
 converting the boolean value @code{false} to @code{NULL}. This warning
@@ -6975,6 +6987,20 @@ The following options are enabled: @code{-fprofile-arcs}, @code{-fprofile-values
 If @var{path} is specified, GCC will look at the @var{path} to find
 the profile feedback data files. See @option{-fprofile-dir}.
 
+@item -fprofile-generate-sampling
+@opindex -fprofile-generate-sampling
+
+Enable sampling for instrumented binaries.  Instead of recording every event,
+record only every N-th event, where N (the sampling rate) can be set either
+at compile time using
+@option{--param profile-generate-sampling-rate=@var{value}}, or
+at execution start time through environment variable @samp{GCOV_SAMPLING_RATE}.
+
+At this time sampling applies only to branch counters.  A sampling rate of 100
+decreases instrumentated binary slowdown from up to 20x for heavily threaded
+applications down to around 2x.  @option{-fprofile-correction} is always
+needed with sampling.
+
 @item -fprofile-use
 @itemx -fprofile-use=@var{path}
 @opindex fprofile-use
@@ -6991,6 +7017,35 @@ code.
 
 If @var{path} is specified, GCC will look at the @var{path} to find
 the profile feedback data files. See @option{-fprofile-dir}.
+
+@item -fpmu-profile-generate=@var{pmuoption}
+@opindex fpmu-profile-generate
+
+Enable performance monitoring unit (PMU) profiling.  This collects
+hardware counter data corresponding to @var{pmuoption}.  Currently
+only @var{load-latency} and @var{branch-mispredict} are supported
+using pfmon tool.  You must use @option{-fpmu-profile-generate} both
+when compiling and when linking your program.  This PMU profile data
+may later be used by the compiler during optimizations as well can be
+displayed using coverage tool gcov. The params variable
+"pmu_profile_n_addresses" can be used to restrict PMU data collection
+to only this many addresses.
+
+@item -fpmu-profile-use=@var{pmuoption}
+@opindex fpmu-profile-use
+
+Enable performance monitoring unit (PMU) profiling based
+optimizations.  Currently only @var{load-latency} and
+@var{branch-mispredict} are supported.
+
+@item -fcgraph-section
+@opindex fcgraph-section
+Emit call graph edge profile counts in .note.callgraph.text sections. This is
+used in conjunction with @option{-fprofile-use}. A new .note.callgraph.text
+section is created for each function. This section lists every callee and the
+number of times it is called. The params variable
+"note-cgraph-section-edge-threshold" can be used to only list edges above a
+certain threshold.
 
 @item -fripa
 @opindex fripa
@@ -7020,6 +7075,10 @@ ignored for this comparison.
 @opindex fripa-verbose
 Enable printing of verbose information about dynamic inter-procedural optimizations.
 This is used in conjunction with the @option{-fripa}.
+
+@item -fripa-no-promote-always-inline-func
+@opindex fripa-no-promote-always-inline-func
+Do not promote static functions with always inline attribute in LIPO compilation.
 
 @item -fsample-profile
 @itemx -fsample-profile=@var{path}
@@ -7293,6 +7352,23 @@ and actually performs the optimizations based on them.
 Currently the optimizations include specialization of division operation
 using the knowledge about the value of the denominator.
 
+@item -ffvpt
+@opindex ffvpt
+If combined with @option{-fvpt and -ffvpt_functions}, it instructs the
+compiler to add a code to gather information about math library calls.
+
+With @option{-fbranch-probabilities}, it reads back the data gathered
+and actually performs the optimizations based on them.
+Currently the optimizations include specialization of function calls
+using precalculated values of common inputs.
+
+@item -ffvpt-functions=@var{ffvptfunctions}
+@opindex ffvpt
+This options takes a comma separated list of math functions to be
+profiled/optimized by @option{-ffvpt}. The special name ``all'' can be
+used to specify all supported math functions. Currently, exp, log,
+pow, and sqrt are supported.
+
 @item -frename-registers
 @opindex frename-registers
 Attempt to avoid false dependencies in scheduled code by making use
@@ -7400,6 +7476,11 @@ If a guard check fails, an error message is printed and the program exits.
 @item -fstack-protector-all
 @opindex fstack-protector-all
 Like @option{-fstack-protector} except that all functions are protected.
+
+NOTE: When --enable-esp this option is enabled by default 
+for C, C++, ObjC, ObjC++, if neither @option{-fno-stack-protector}
+or @option{-nostdlib} or @option{-nodefaultlibs} or 
+@option{-fstack-protector} are found.
 
 @item -fsection-anchors
 @opindex fsection-anchors
@@ -8138,6 +8219,15 @@ attributed to it, it will be assigned a weight of 0 with high
 confidence.  This parameter is only useful when using
 @option{-fsample-profile}.
 
+@item max-lipo-mem
+When importing auxiliary modules during profile-use, check current
+memory consumption after parsing each auxiliary module. If it exceeds
+this limit (specified in kb), don't import any more auxiliary modules.
+Specifying a value of 0 means don't enforce this limit. This parameter
+is only useful when using @option{-fprofile-use} and @option{-fripa}.
+
+@item profile-generate-sampling-rate
+Set the sampling rate with @option{-fprofile-generate-sampling}.
 
 @end table
 @end table
@@ -8320,6 +8410,12 @@ Produce a position independent executable on targets which support it.
 For predictable results, you must also specify the same set of options
 that were used to generate code (@option{-fpie}, @option{-fPIE},
 or model suboptions) when you specify this option.
+
+NOTE: When --enable-esp this option is enabled by default
+for C, C++, ObjC, ObjC++, if neither @option{-fno-pie} or @option{-fno-PIE}
+or @option{-fno-pic} or @option{-fno-PIC} or @option{-nostdlib} or
+@option{-nostartfiles} or @option{-shared} or @option{-pg} or @option{-p}
+are found.
 
 @item -rdynamic
 @opindex rdynamic
@@ -9353,11 +9449,6 @@ library calls for floating-point operations.
 instructions, but still uses the soft-float calling conventions.  
 @samp{hard} allows generation of floating-point instructions 
 and uses FPU-specific calling conventions.
-
-Using @option{-mfloat-abi=hard} with VFP coprocessors is not supported.
-Use @option{-mfloat-abi=softfp} with the appropriate @option{-mfpu} option
-to allow the compiler to generate code that makes use of the hardware
-floating-point capabilities for these CPUs.
 
 The default depends on the specific target configuration.  Note that
 the hard-float and soft-float ABIs are not link-compatible; you must
@@ -11342,6 +11433,9 @@ SSE2 and SSE3 instruction set support.
 @item core2
 Intel Core2 CPU with 64-bit extensions, MMX, SSE, SSE2, SSE3 and SSSE3
 instruction set support.
+@item atom
+Intel Atom CPU with 64-bit extensions, MMX, SSE, SSE2, SSE3 and SSSE3
+instruction set support.
 @item k6
 AMD K6 CPU with MMX instruction set support.
 @item k6-2, k6-3
@@ -11677,6 +11771,8 @@ preferred alignment to @option{-mpreferred-stack-boundary=2}.
 @itemx -mno-sse4a
 @itemx -msse5
 @itemx -mno-sse5
+@itemx -mlwp
+@itemx -mno-lwp
 @itemx -m3dnow
 @itemx -mno-3dnow
 @itemx -mpopcnt
@@ -11690,8 +11786,8 @@ preferred alignment to @option{-mpreferred-stack-boundary=2}.
 @opindex m3dnow
 @opindex mno-3dnow
 These switches enable or disable the use of instructions in the MMX,
-SSE, SSE2, SSE3, SSSE3, SSE4.1, AVX, AES, PCLMUL, SSE4A, SSE5, ABM or
-3DNow!@: extended instruction sets.
+SSE, SSE2, SSE3, SSSE3, SSE4.1, AVX, AES, PCLMUL, SSE4A, SSE5, LWP,
+ABM or 3DNow!@: extended instruction sets.
 These extensions are also available as built-in functions: see
 @ref{X86 Built-in Functions}, for details of the functions enabled and
 disabled by these switches.
@@ -11741,6 +11837,11 @@ SAHF are load and store instructions, respectively, for certain status flags.
 In 64-bit mode, SAHF instruction is used to optimize @code{fmod}, @code{drem}
 or @code{remainder} built-in functions: see @ref{Other Builtins} for details.
 
+@item -mmovbe
+@opindex mmovbe
+This option will enable GCC to use movbe instruction to implement
+@code{__builtin_bswap32} and @code{__builtin_bswap64}.
+
 @item -mrecip
 @opindex mrecip
 This option will enable GCC to use RCPSS and RSQRTSS instructions (and their
@@ -11776,6 +11877,16 @@ function type when @option{-mveclibabi=svml} is used and @code{__vrd2_sin},
 when @option{-mveclibabi=acml} is used. Both @option{-ftree-vectorize} and
 @option{-funsafe-math-optimizations} have to be enabled. A SVML or ACML ABI
 compatible library will have to be specified at link time.
+
+@item -mabi=@var{name}
+@opindex mabi
+Generate code for the specified calling convention.  Permissible values
+are: @samp{sysv} for the ABI used on GNU/Linux and other systems and
+@samp{ms} for the Microsoft ABI.  The default is to use the Microsoft
+ABI when targeting Windows.  On all other systems, the default is the
+SYSV ABI.  You can control this behavior for a specific function by
+using the function attribute @samp{ms_abi}/@samp{sysv_abi}.
+@xref{Function Attributes}.
 
 @item -mpush-args
 @itemx -mno-push-args
@@ -16277,6 +16388,11 @@ used during linking.
 @option{-fpie} and @option{-fPIE} both define the macros
 @code{__pie__} and @code{__PIE__}.  The macros have the value 1
 for @option{-fpie} and 2 for @option{-fPIE}.
+
+NOTE: When --enable-esp this option is enabled by default
+for C, C++, ObjC, ObjC++, if neither @option{-fno-pie} or @option{-fno-PIE}
+or @option{-fno-pic} or @option{-fno-PIC} or @option{-nostdlib} or
+@option{-nostartfiles} or @option{-shared} are found.
 
 @item -fno-jump-tables
 @opindex fno-jump-tables

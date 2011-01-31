@@ -41,6 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "target.h"
 #include "tm_p.h"
 #include "function.h"
+#include "params.h"
 
 #ifndef DOLLARS_IN_IDENTIFIERS
 # define DOLLARS_IN_IDENTIFIERS true
@@ -405,6 +406,7 @@ c_common_handle_option (size_t scode, const char *arg, int value)
 	 warning about not using it without also specifying -O.  */
       if (warn_uninitialized != 1)
 	warn_uninitialized = (value ? 2 : 0);
+      warn_maybe_uninitialized = value;
 
       if (!c_dialect_cxx ())
 	{
@@ -1096,9 +1098,9 @@ c_common_post_options (const char **pfilename)
     warn_sign_conversion =  (c_dialect_cxx ()) ? 0 : warn_conversion;
 
   /* Enable warning for null conversion when -Wconversion is specified (unless
-     disabled through -Wno-null-conversion).  */
-  if (warn_null_conversion == -1)
-    warn_null_conversion = warn_conversion;
+     disabled through -Wno-conversion-null).  */
+  if (warn_conversion_null == -1)
+    warn_conversion_null = warn_conversion;
 
   /* Enable warning for converting real values to integral values
      when -Wconversion is specified (unless disabled through
@@ -1229,6 +1231,28 @@ c_common_init (void)
   return true;
 }
 
+/* Return TRUE if the lipo maximum memory consumption limit is reached, and
+   we should not import any further auxiliary modules. Check after parsing
+   each module, the Ith module being the just parsed module.  */
+static bool
+lipo_max_mem_reached (unsigned int i)
+{
+  if (L_IPO_COMP_MODE && PARAM_VALUE (PARAM_MAX_LIPO_MEMORY)
+      && i < (num_in_fnames - 1)
+      && ((ggc_total_allocated () >> 10)
+          > (size_t) PARAM_VALUE (PARAM_MAX_LIPO_MEMORY))) {
+    i++;
+    do {
+      inform (input_location, "Not importing %s: maximum memory "
+	      "consumption reached", in_fnames[i]);
+      i++;
+    } while (i < num_in_fnames);
+    return true;
+  }
+  return false;
+}
+
+
 /* Initialize the integrated preprocessor after debug output has been
    initialized; loop over each input file.  */
 void
@@ -1270,6 +1294,12 @@ c_common_parse_file (int set_yydebug)
       set_lipo_c_parsing_context (parse_in, i, verbose);
       push_file_scope ();
       c_parse_file ();
+      /* In lipo mode, processing too many auxiliary files will cause us
+	 to hit memory limits, and cause thrashing -- prevent this by not
+	 processing any further auxiliary modules if we reach a certain
+	 memory limit.  */
+      if (lipo_max_mem_reached (i))
+	num_in_fnames = i + 1;
       finish_file ();
       pop_file_scope ();
       /* And end the main input file, if the debug writer wants it  */

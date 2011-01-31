@@ -28,7 +28,7 @@ extern void exit (int);
 
 static ATTR void recurser_void1 (void);
 static ATTR void recurser_void2 (void);
-extern void track (void);
+static ATTR void track (void);
 
 int n = 0;
 int main ()
@@ -67,7 +67,7 @@ recurser_void2 (void)
 
 void *trackpoint;
 
-void
+static void __attribute__((noinline)) ATTR
 track ()
 {
   char stackpos[1];

@@ -5702,7 +5702,11 @@ decl_default_tls_model (const_tree decl)
   bool is_local;
 
   is_local = targetm.binds_local_p (decl);
-  if (!flag_shlib)
+  #ifdef ENABLE_ESP
+    if (!flag_pic)
+  #else
+    if (!flag_shlib)
+  #endif
     {
       if (is_local)
 	kind = TLS_MODEL_LOCAL_EXEC;

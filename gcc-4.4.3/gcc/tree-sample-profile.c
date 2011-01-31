@@ -82,6 +82,8 @@ struct sample_freq_detail *sample_buf;
    <stack[0].filename>:<stack[0].line_num>.  */
 static htab_t sp_inline_htab;
 
+static htab_t sp_indirect_htab;
+
 static htab_t sp_funcname_htab;
 /* Buffer to hold elements inserted into sp_inline_htab.  */
 struct sample_inline_freq *inline_sample_buf;
@@ -166,6 +168,36 @@ dump_cfg_profile (const char *pname)
   fclose (prof_compare_file);
 }
 
+/* extract the path info of NAME, and return the file name.  */
+static const char *realname (const char *name) {
+  const char *c;
+  for (c = name; *c; c++) {
+    if (*c == '/') name = c+1;
+  }
+  return name;
+}
+
+static hashval_t
+sp_indirect_hash (const void *fb_info)
+{
+  const struct sample_indirect_call *si =
+    (const struct sample_indirect_call *) fb_info;
+  hashval_t h = 0x9e3779b9;
+
+  return iterative_hash (si->func_name, strlen (si->func_name), h);
+}
+
+static int
+sp_indirect_eq (const void *p, const void *q)
+{
+  const struct sample_indirect_call *a =
+      (const struct sample_indirect_call *) p;
+
+  const struct sample_indirect_call *b =
+      (const struct sample_indirect_call *) q;
+
+  return !strcmp(a->func_name, b->func_name);
+}
 
 /* Functions used for hash table to store samples.
    key = string base_filename:line_num.  */
@@ -173,15 +205,14 @@ dump_cfg_profile (const char *pname)
 /* Create a hash string with FILENAME, LINE_NUM, DISCRIMINATOR, and
    FUNCNAME.  */
 static hashval_t
-create_hash_string (const char *filename, int line_num, int discriminator, 
-		    const char *funcname)
+create_hash_string (const char *filename, int line_num, int discriminator)
 {
   /* An arbitrary initial value borrowed from hashtab.c.  */
   hashval_t h = 0x9e3779b9;
+  filename = realname (filename);
   h = iterative_hash (filename, strlen (filename), h);
   h = iterative_hash (&line_num, sizeof (line_num), h);
   h = iterative_hash (&discriminator, sizeof(discriminator), h);
-  h = iterative_hash (funcname, strlen (funcname), h);
   return h;
 }
 
@@ -195,8 +226,8 @@ sp_info_hash (const void *fb_info)
 
   gcc_assert (sp->line_num >= 0);
 
-  return create_hash_string (sp->filename, sp->line_num, sp->discriminator, 
-			     sp->func_name);
+  return create_hash_string (realname (sp->filename), sp->line_num,
+                             sp->discriminator);
 }
 
 
@@ -213,8 +244,7 @@ sp_info_eq (const void *p, const void *q)
 
   return (a->line_num == b->line_num)
     && (a->discriminator == b->discriminator)
-    && (!strcmp (a->filename, b->filename))
-    && (!strcmp (a->func_name, b->func_name));
+    && (!strcmp (realname (a->filename), realname (b->filename)));
 }
 
 /* Compute hash value for INLINE_INFO.  */
@@ -230,19 +260,18 @@ sp_inline_info_hash (const void *inline_info)
 
   while (i < depth)
     {
-       h = iterative_hash (i_info->inline_stack[i].loc.file,
-                           strlen (i_info->inline_stack[i].loc.file), h);
+       h = iterative_hash (realname (i_info->inline_stack[i].loc.file),
+                           strlen (realname (i_info->inline_stack[i].loc.file)),
+                                             h);
        h = iterative_hash (&(i_info->inline_stack[i].loc.line),
                            sizeof (i_info->inline_stack[i].loc.line), h);
-       h = iterative_hash (&(i_info->inline_stack[i].discriminator),
-                           sizeof (i_info->inline_stack[i].discriminator), h);
        i++;
     }
-  h = iterative_hash (i_info->filename, strlen (i_info->filename), h);
+  h = iterative_hash (realname (i_info->filename),
+                      strlen (realname (i_info->filename)), h);
   h = iterative_hash (&(i_info->line_num), sizeof (i_info->line_num), h);
   h = iterative_hash (&(i_info->discriminator),
 		      sizeof (i_info->discriminator), h);
-  h = iterative_hash (i_info->func_name, strlen (i_info->func_name), h);
 
   return h;
 }
@@ -273,15 +302,13 @@ sp_inline_info_eq (const void *p, const void *q)
   while (i < a->depth)
     {
       if ((a->inline_stack[i].loc.line != b->inline_stack[i].loc.line)
-          || (a->inline_stack[i].discriminator !=
-              b->inline_stack[i].discriminator)
-          || strcmp (a->inline_stack[i].loc.file, b->inline_stack[i].loc.file))
+          || strcmp (realname (a->inline_stack[i].loc.file),
+                     realname (b->inline_stack[i].loc.file)))
         return 0;
       i++;
     }
 
-  return !strcmp (a->filename, b->filename) 
-         && !strcmp (a->func_name, b->func_name);
+  return !strcmp (realname (a->filename), realname (b->filename));
 }
 
 /* Usage model: All elements in the hash table are deleted only at time of hash
@@ -415,6 +442,54 @@ sp_get_inline_stack (gimple stmt, struct expanded_inline_location *stack)
     stack[i++].discriminator = get_discriminator_from_locus (last_loc);
   }
   return i;
+}
+
+/* Build a hashtab element to state that FUNC_NAME has an indirect
+   call edge of weight COUNT to the TARGET function.  */
+
+static void
+sp_add_indirect_call (const char *func_name, const char *target,
+                      gcov_type count)
+{
+  struct sample_indirect_call ic;
+  struct sample_indirect_call *entry;
+  struct sample_indirect_call **slot;
+  unsigned i;
+  ic.func_name = func_name;
+
+  slot = (struct sample_indirect_call **)
+         htab_find_slot (sp_indirect_htab, (void *) &ic, INSERT);
+
+  if (!*slot) {
+    *slot = (struct sample_indirect_call *)
+                 xmalloc(sizeof(struct sample_indirect_call));
+    (*slot)->func_name = func_name;
+    (*slot)->num_values = 0;
+  }
+  entry = *slot;
+  if (entry->num_values == MAX_IND_FUNCS)
+    return;
+  for (i = 0; i < entry->num_values; i++) {
+    if (!strcmp(target, entry->targets[i])) {
+      entry->count[i] += count;
+      return;
+    }
+  }
+  entry->targets[entry->num_values] = 0;
+  entry->targets[entry->num_values++] = target;
+}
+
+/* Read in the FUNC_NAME, return the hashtab that contains the
+   indirect calls from this function.  */
+
+struct sample_indirect_call *
+sp_get_indirect_calls (const char *func_name)
+{
+  struct sample_indirect_call ic;
+  ic.func_name = func_name;
+
+  return (struct sample_indirect_call *)
+         htab_find (sp_indirect_htab, (void *) &ic);
 }
 
 /* Read file header from input file INFILE into PROG_UNIT. Return 0 if
@@ -747,10 +822,18 @@ read_inline_function (FILE *infile, struct profile *prog_unit,
             for (k = 0; k < sample.num_value; k++) {
               inline_sample_buf[j].values[k].type = hist_buf[k].type;
               if (hist_buf[k].type == CALL_HIST)
-                inline_sample_buf[j].values[k].value.func_name =
-                    &(prog_unit->str_table[hist_buf[k].value]);
+                {
+                  inline_sample_buf[j].values[k].value.func_name =
+                      &(prog_unit->str_table[hist_buf[k].value]);
+                  sp_add_indirect_call (
+                      &(prog_unit->str_table[func_hdr->func_name_index]),
+                      &(prog_unit->str_table[hist_buf[k].value]),
+                      hist_buf[k].count);
+                }
               else
-                inline_sample_buf[j].values[k].value.value = hist_buf[k].value;
+                {
+                  inline_sample_buf[j].values[k].value.value = hist_buf[k].value;
+                }
               inline_sample_buf[j].values[k].count = hist_buf[k].count;
             }
           }
@@ -893,7 +976,7 @@ sp_read_modules (FILE *infile, struct profile *prog_unit)
     {
       char *file_name = &(prog_unit->str_table[hdr[i].module_name_index]);
       /* Traverse the modules to find the primarial module.  */
-      if (!strcmp (file_name, curr_file_name))
+      if (!strcmp (realname (file_name), realname (curr_file_name)))
         {
           unsigned int j;
           int curr_module = 1, idx = 0;
@@ -996,7 +1079,8 @@ sp_reader (const char *in_filename, struct profile *prog_unit)
 
       sample_buf[0].func_name =
           &(prog_unit->str_table[func_hdr.func_name_index]);
-      sample_buf[0].filename = "";
+      sample_buf[0].filename =
+          &(prog_unit->str_table[func_hdr.func_name_index]);
       sample_buf[0].line_num = 0;
       sample_buf[0].discriminator = 0;
       sample_buf[0].freq = func_hdr.entry_count;
@@ -1056,10 +1140,18 @@ sp_reader (const char *in_filename, struct profile *prog_unit)
             for (k = 0; k < sample.num_value; k++) {
               sample_buf[j].values[k].type = hist_buf[k].type;
               if (hist_buf[k].type == CALL_HIST)
-                sample_buf[j].values[k].value.func_name =
-                    &(prog_unit->str_table[hist_buf[k].value]);
+                {
+                  sample_buf[j].values[k].value.func_name =
+                      &(prog_unit->str_table[hist_buf[k].value]);
+                  sp_add_indirect_call (
+                      &(prog_unit->str_table[func_hdr.func_name_index]),
+                      &(prog_unit->str_table[hist_buf[k].value]),
+                      hist_buf[k].count);
+                }
               else
-                sample_buf[j].values[k].value.value = hist_buf[k].value;
+                {
+                  sample_buf[j].values[k].value.value = hist_buf[k].value;
+                }
               sample_buf[j].values[k].count = hist_buf[k].count;
             }
           }
@@ -1106,18 +1198,18 @@ compare (const void *a, const void *b) {
   const struct sample_hist *y = (const struct sample_hist *) b;
   if (x->type != y->type)
     {
-      return x->type - y->type;
+      return y->type - x->type;
     }
   else if (x->count != y->count)
     {
-      return x->count - y->count;
+      return y->count - x->count;
     }
   else
     {
       if (x->type == CALL_HIST)
         return strcmp (x->value.func_name, y->value.func_name);
       else
-        return x->value.value - y->value.value;
+        return y->value.value - x->value.value;
     }
 }
 
@@ -1140,20 +1232,20 @@ sp_annotate_bb (basic_block bb)
   if (flag_sample_profile_use_entry && bb == ENTRY_BLOCK_PTR)
     {
       struct sample_freq_detail ir_loc;
-      struct sample_freq_detail *htab_entry;
-      hashval_t hash_val;
-      ir_loc.filename = "";
+      struct sample_freq_detail **slot;
+      struct sample_freq_detail *htab_entry = NULL;
+      ir_loc.filename
+            = sp_get_real_funcname (current_function_assembler_name ());
       ir_loc.func_name
             = sp_get_real_funcname (current_function_assembler_name ());
       ir_loc.line_num = 0;
       ir_loc.discriminator = 0;
 
-      hash_val = create_hash_string (ir_loc.filename, ir_loc.line_num,
-                                     ir_loc.discriminator,
-                                     ir_loc.func_name);
-
-      htab_entry = (struct sample_freq_detail *)
-      htab_find_with_hash (sp_htab, (void *) &ir_loc, hash_val);
+      slot = (struct sample_freq_detail **)
+        htab_find_slot (sp_htab, &ir_loc, INSERT);
+      if (*slot) {
+        htab_entry = *slot;
+      }
 
       if (htab_entry) {
         bb->count = htab_entry->freq;
@@ -1244,8 +1336,8 @@ sp_annotate_bb (basic_block bb)
           ir_loc.line_num = lineno;
 	  ir_loc.discriminator = discriminator;
 
-          hash_val = create_hash_string (ir_loc.filename, lineno, discriminator,
-					 ir_loc.func_name);
+          hash_val = create_hash_string (ir_loc.filename, lineno,
+                                         discriminator);
 
           htab_entry = (struct sample_freq_detail *)
           htab_find_with_hash (sp_htab, (void *) &ir_loc, hash_val);
@@ -1426,6 +1518,7 @@ sp_annotate_cfg (void)
   basic_block bb;
   int num_bb_annotated = 0;
   gcov_type func_max_count = 0;
+  cgraph_need_artificial_indirect_call_edges = 0;
 
   if (dump_file)
     {
@@ -1520,6 +1613,12 @@ init_sample_profile (void)
                                           0,
                                           xcalloc,
                                           free);
+  sp_indirect_htab = htab_create_alloc ((size_t) SP_FUNCNAME_HTAB_INIT_SIZE,
+                                        sp_indirect_hash,
+                                        sp_indirect_eq,
+                                        0,
+                                        xcalloc,
+                                        free);
 
   sp_num_samples = sp_reader (sample_data_name, &prog_unit);
   sp_profile_info =
@@ -1551,6 +1650,8 @@ end_sample_profile (void)
   if (sp_inline_htab)
     htab_delete (sp_inline_htab);
   sp_inline_htab = NULL;
+  if (sp_indirect_htab)
+    htab_delete (sp_indirect_htab);
   free (inline_sample_buf);
   if (sp_profile_info)
     free (sp_profile_info);
@@ -1561,6 +1662,9 @@ static unsigned int
 execute_sample_profile (void)
 {
   /* Annotate CFG with sample profile.  */
+  flow_call_edges_add (NULL);
+  compact_blocks ();
+  remove_fake_edges ();
   sp_annotate_cfg ();
   cfun->after_tree_profile = 1;
   return 0;
