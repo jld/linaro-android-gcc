@@ -3342,3 +3342,42 @@ gcc/testsuite/g++.dg/debug/dwarf2/pr41063.C
   http://gcc.gnu.org/ml/gcc-patches/2009-08/msg01508.html
   Owner: ccoutant
   Status: backported from GCC 4.5 revs 151185 and 151187.
+
+gcc/value-prof.c
+  Added a more helpful error message when the profile is corrupted.
+  Owner: asharif
+  Status: In upstream trunk 169387.
+
+gcc/tree-vect-analyze.c
+  Added check for abnormal ssa names in the analysis phase of the vectorizer
+  so that it prevents a potential ICE.
+  Owner: asharif
+  Status: local
+
+gcc/ipa-inline.c
+  Cherry-pick CL 48027-p2.
+  Replace floating-point calculations with fixed-point calculations when
+  computing inlining priority to eliminate floating-point non-determinism
+  on 32-bit x86.  Fixes b/3412478.
+  Owner: dougkwan
+  Status: not yet upstream
+
+gcc/acinclude.m4
+gcc/config.gcc
+gcc/config/avr/avr.c
+gcc/config/ia64/ia64.c
+gcc/config/initfini-array.c
+gcc/config/initfini-array.h
+gcc/config/rs6000/rs6000.c
+gcc/config/stormy16/stormy16.c
+gcc/config/t-initfini-array
+gcc/config/v850/v850.c
+gcc/configure
+gcc/configure.ac
+gcc/crtstuff.c
+  Cherry-pick CL 47894-p2.
+  Use .init_array/.fini_array sections instead of .ctor/.dtor when
+  configured with --enable-initfini-array.
+  Owner: dougkwan
+  Status: apply the patch http://gcc.gnu.org/ml/gcc-patches/2011-01/msg01942.html.
+  Not yet upstream.
