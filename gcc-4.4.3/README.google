@@ -3381,3 +3381,8 @@ gcc/crtstuff.c
   Owner: dougkwan
   Status: apply the patch http://gcc.gnu.org/ml/gcc-patches/2011-01/msg01942.html.
   Not yet upstream.
+
+libstdc++/include/Makefile.in
+  Installed cpu_defines.h in freestanding standing mode (libstdc++/48123)
+  Owner: dougkwan
+  Status: In gcc trunk rev 171019
