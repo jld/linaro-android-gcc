@@ -829,8 +829,11 @@ static const char *cpp_unique_options =
  %{remap} %{g3|ggdb3|gstabs3|gcoff3|gxcoff3|gvms3:-dD}\
  %{H} %C %{D*&U*&A*} %{i*} %Z %i\
  %{fmudflap:-D_MUDFLAP -include mf-runtime.h}\
- %{fmudflapth:-D_MUDFLAP -D_MUDFLAPTH -include mf-runtime.h}\
- %{E|M|MM:%W{o*}}";
+ %{fmudflapth:-D_MUDFLAP -D_MUDFLAPTH -include mf-runtime.h}"
+#ifdef EFAULT_FORTIFY_SOURCE
+" %{!D_FORTIFY_SOURCE:%{!D_FORTIFY_SOURCE=*:%{!U_FORTIFY_SOURCE:-D_FORTIFY_SOURCE=2}}}"
+#endif
+" %{E|M|MM:%W{o*}}";
 
 /* This contains cpp options which are common with cc1_options and are passed
    only when preprocessing only to avoid duplication.  We pass the cc1 spec

@@ -1495,8 +1495,7 @@ update_caller_keys (fibheap_t heap, struct cgraph_node *node,
   struct cgraph_edge *edge;
   const char *failed_reason;
 
-  if (!node->local.inlinable || node->local.disregard_inline_limits
-      || node->global.inlined_to)
+  if (!node->local.inlinable || node->global.inlined_to)
     return;
   if (bitmap_bit_p (updated_nodes, node->uid))
     return;

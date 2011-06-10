@@ -3386,3 +3386,65 @@ libstdc++/include/Makefile.in
   Installed cpu_defines.h in freestanding standing mode (libstdc++/48123)
   Owner: dougkwan
   Status: In gcc trunk rev 171019
+
+gcc/gcc.c
+gcc/esp.h
+  Added the ability to have the driver always pass in -D_FORTIFY_SOURCE=2
+  when doing compiles.
+  Also guarded -z,now and -z,relro with other defines.
+  Owner: asharif
+  Status: local, derived from Gentoo patchset:
+  http://distfiles.gentoo.org/distfiles/gcc-4.4.3-patches-1.4.tar.bz2
+
+gcc/ipa-inline.c
+  Fix updating of inlining priority for corner-case in which callsites of
+  always_inline functions are promoted from indirect calls during inlining.
+  Owner: meheff
+  Status: local
+
+libstdc++-v3/include/Makefile.am
+libstdc++-v3/include/Makefile.in
+  Backport r173220 from trunk to fix freestanding C++ library.
+  http://gcc.gnu.org/viewcvs?view=revision&revision=173220
+  Owner: dougkwan
+  Status: upstream
+
+gcc/config/arm/thumb2.md
+  Fix out-of-range branches in Thumb-2 mode. b/2961998
+  Owner: dougkwan
+  Status: In upstream r149501.
+
+gcc/libgcov.c
+  Fix gcda corruption problem in b/4462929 reported by an external user.
+  Fix contributed by <nkondrashov@nvidia.com>
+  Owner: dougkwan
+  Status: local
+
+Makefile.in
+Makefile.tpl
+configure
+configure.ac
+  Propagate LDFLAGS_FOR_TARGETS in top level configure.
+  This is required to build x86 Android toolchain properly.
+  Owner: dougkwan
+  Status: backport of upstream r173558
+
+gcc/config/i386/i386.c
+gcc/config/i386/i386.h
+gcc/config/i386/i386.md
+gcc/testsuite/gcc.target/i386/pad-1.c
+gcc/testsuite/gcc.target/i386/pad-10.c
+gcc/testsuite/gcc.target/i386/pad-2.c
+gcc/testsuite/gcc.target/i386/pad-3.c
+gcc/testsuite/gcc.target/i386/pad-4.c
+gcc/testsuite/gcc.target/i386/pad-5a.c
+gcc/testsuite/gcc.target/i386/pad-5b.c
+gcc/testsuite/gcc.target/i386/pad-6a.c
+gcc/testsuite/gcc.target/i386/pad-6b.c
+gcc/testsuite/gcc.target/i386/pad-7.c
+gcc/testsuite/gcc.target/i386/pad-8.c
+gcc/testsuite/gcc.target/i386/pad-9.c
+  Backport r164379 from trunk to help Atom performance on small functions.
+  http://gcc.gnu.org/viewcvs?view=revision&revision=164379
+  Owner: asharif
+  Status: upstream in r164379

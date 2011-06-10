@@ -34,8 +34,19 @@
 	/*	ESP_LINK_SPEC is added to LINK_PIE_SPEC if esp is enable
 		-z now will be added if we don't have -vanilla spec. We do a -pie incompatible check
 		Don't remove the specs in the end  */
-	#define ESP_LINK_SPEC "%(esp_link_now) %(esp_link_pie_check) "
-	#define ESP_LINK_NOW_SPEC "%{!nonow:-z now}"
+	#define ESP_LINK_SPEC "%(esp_link_now) %(esp_link_pie_check) %(esp_link_relro)"
+
+  #if defined EFAULT_BIND_NOW
+	  #define ESP_LINK_NOW_SPEC "%{!nonow:-z now}"
+  #else
+	  #define ESP_LINK_NOW_SPEC ""
+  #endif
+
+  #if defined EFAULT_RELRO
+	  #define ESP_LINK_RELRO_SPEC "%{!norelro:-z relro}"
+  #else
+	  #define ESP_LINK_RELRO_SPEC ""
+  #endif
 
 	/*	We use ESP_COMMAND_OPTIONS_SPEC to add pie command-line options.  */
 	#define ESP_COMMAND_OPTIONS_SPEC "%{!D__KERNEL__:%{!nopie:%(esp_options_pie) %(esp_link_pie)}}"
@@ -120,6 +131,7 @@
 		{ "esp_cc1_strict_overflow",				ESP_CC1_STRICT_OVERFLOW_SPEC },	\
 		{ "esp_link",								ESP_LINK_SPEC },				\
 		{ "esp_link_now",							ESP_LINK_NOW_SPEC },			\
+		{ "esp_link_relro",							ESP_LINK_RELRO_SPEC },			\
 		{ "esp_link_pie",							ESP_LINK_PIE_SPEC },			\
 		{ "esp_link_pie_check",						ESP_LINK_PIE_CHECK_SPEC },		\
 		{ "esp_command_options",					ESP_COMMAND_OPTIONS_SPEC },		\
