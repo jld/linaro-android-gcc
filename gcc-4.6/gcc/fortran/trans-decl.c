@@ -677,7 +677,7 @@ gfc_get_module_backend_decl (gfc_symbol *sym)
 	}
       else if (s->backend_decl)
 	{
-	  if (sym->ts.type == BT_DERIVED)
+	  if (sym->ts.type == BT_DERIVED || sym->ts.type == BT_CLASS)
 	    gfc_copy_dt_decls_ifequal (s->ts.u.derived, sym->ts.u.derived,
 				       true);
 	  else if (sym->ts.type == BT_CHARACTER)
@@ -1123,7 +1123,10 @@ gfc_get_symbol_decl (gfc_symbol * sym)
     {
       gfc_component *c = CLASS_DATA (sym);
       if (!c->ts.u.derived->backend_decl)
-	gfc_find_derived_vtab (c->ts.u.derived);
+	{
+	  gfc_find_derived_vtab (c->ts.u.derived);
+	  gfc_get_derived_type (sym->ts.u.derived);
+	}
     }
 
   /* All deferred character length procedures need to retain the backend
@@ -1599,6 +1602,11 @@ gfc_get_extern_function_decl (gfc_symbol * sym)
       gfc_find_symbol (sym->name, gsym->ns, 0, &s);
       if (s && s->backend_decl)
 	{
+	  if (sym->ts.type == BT_DERIVED || sym->ts.type == BT_CLASS)
+	    gfc_copy_dt_decls_ifequal (s->ts.u.derived, sym->ts.u.derived,
+				       true);
+	  else if (sym->ts.type == BT_CHARACTER)
+	    sym->ts.u.cl->backend_decl = s->ts.u.cl->backend_decl;
 	  sym->backend_decl = s->backend_decl;
 	  return sym->backend_decl;
 	}
@@ -4176,10 +4184,16 @@ generate_local_decl (gfc_symbol * sym)
 			     "declared INTENT(OUT) but was not set and "
 			     "does not have a default initializer",
 			     sym->name, &sym->declared_at);
+	      if (sym->backend_decl != NULL_TREE)
+		TREE_NO_WARNING(sym->backend_decl) = 1;
 	    }
 	  else if (gfc_option.warn_unused_dummy_argument)
-	    gfc_warning ("Unused dummy argument '%s' at %L", sym->name,
+	    {
+	      gfc_warning ("Unused dummy argument '%s' at %L", sym->name,
 			 &sym->declared_at);
+	      if (sym->backend_decl != NULL_TREE)
+		TREE_NO_WARNING(sym->backend_decl) = 1;
+	    }
 	}
 
       /* Warn for unused variables, but not if they're inside a common
@@ -4224,11 +4238,6 @@ generate_local_decl (gfc_symbol * sym)
 	mark the symbol now, as well as in traverse_ns, to prevent
 	getting stuck in a circular dependency.  */
       sym->mark = 1;
-
-      /* We do not want the middle-end to warn about unused parameters
-         as this was already done above.  */
-      if (sym->attr.dummy && sym->backend_decl != NULL_TREE)
-	  TREE_NO_WARNING(sym->backend_decl) = 1;
     }
   else if (sym->attr.flavor == FL_PARAMETER)
     {
@@ -4843,11 +4852,11 @@ gfc_generate_function_code (gfc_namespace * ns)
       if (result == NULL_TREE)
 	{
 	  /* TODO: move to the appropriate place in resolve.c.  */
-	  if (warn_return_type && !sym->attr.referenced && sym == sym->result)
+	  if (warn_return_type && sym == sym->result)
 	    gfc_warning ("Return value of function '%s' at %L not set",
 			 sym->name, &sym->declared_at);
-
-	  TREE_NO_WARNING(sym->backend_decl) = 1;
+	  if (warn_return_type)
+	    TREE_NO_WARNING(sym->backend_decl) = 1;
 	}
       else
 	gfc_add_expr_to_block (&body, gfc_generate_return ());

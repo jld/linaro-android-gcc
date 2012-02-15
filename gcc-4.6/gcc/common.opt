@@ -680,6 +680,10 @@ Wthread-attr-bind-param
 Common Var(warn_thread_attr_bind_param) Init(1) Warning
 Make the thread safety analysis try to bind the function parameters used in the attributes
 
+Wthread-warn-optimization
+Common Var(warn_thread_optimization) Init(1) Warning
+Warn when optimizations invalidate the thread safety analysis.
+
 Wtype-limits
 Common Var(warn_type_limits) Init(-1) Warning
 Warn if a comparison is always true or always false due to the limited range of the data type
@@ -1099,10 +1103,13 @@ Common Report Var(flag_ripa_no_promote_always_inline) Init(0)
 Don't promote always inline static functions assuming they
 will be inlined and no copy is needed.
 
+fripa-peel-size-limit
+Common Report Var(flag_ripa_peel_size_limit) Init(1) Optimization
+Limit non-const non-FP loop peeling under dynamic IPA estimates of large code footprint
 
-fripa-verbose
-Common Report Var(flag_ripa_verbose)
-Enable verbose informational messages for LIPO compilation
+fripa-unroll-size-limit
+Common Report Var(flag_ripa_unroll_size_limit) Init(1) Optimization
+Limit non-const non-FP loop unrolling under dynamic IPA estimates of large code footprint
 
 fearly-inlining
 Common Report Var(flag_early_inlining) Init(1) Optimization
@@ -1327,6 +1334,10 @@ finline-limit=
 Common RejectNegative Joined UInteger
 -finline-limit=<number>	Limit the size of inlined functions to <number>
 
+finline-hot-caller
+Common Report Var(flag_inline_hot_caller) Init(1) Optimization
+Consider inlining cold callsites if the caller includes hot code
+
 finstrument-functions
 Common Report Var(flag_instrument_function_entry_exit)
 Instrument function entry and exit with profiling calls
@@ -1547,6 +1558,19 @@ fomit-frame-pointer
 Common Report Var(flag_omit_frame_pointer) Optimization
 When possible do not generate stack frames
 
+fopt-info
+Common Report Var(flag_opt_info) Optimization Init(0)
+Enable verbose informational messages for optimizations (same as -fopt-info=1)
+
+; fopt-info=0: no message will be emitted.
+; fopt-info or fopt-info=1: emit important warnings and optimization messages with
+;   large performance impact.
+; fopt-info=2: warnings and optimization messages targeting power users.
+; fopt-info=3: informational messages for compiler developers.
+fopt-info=
+Common RejectNegative Joined UInteger Optimization
+-fopt-info=[0|1|2|3] Set the verbose level of informational messages for optimizations
+
 foptimize-register-move
 Common Report Var(flag_regmove) Optimization
 Do the full register move optimization pass
@@ -1692,6 +1716,14 @@ Common Joined RejectNegative Var(common_deferred_options) Defer
 frecord-gcc-switches
 Common Report Var(flag_record_gcc_switches)
 Record gcc command line switches in the object file.
+
+; This option differs from frecord-gcc-switches in the way that it
+; divide the command line options into several categories. And the
+; section is not mergable so that linker can save gcc switches for
+; each module.
+frecord-gcc-switches-in-elf
+Common Report Var(flag_record_gcc_switches_in_elf)
+Record the compiler optimizations in a .gnu.switches.text section.
 
 freg-struct-return
 Common Report Var(flag_pcc_struct_return,0) Optimization
@@ -1866,6 +1898,10 @@ fsingle-precision-constant
 Common Report Var(flag_single_precision_constant) Optimization
 Convert floating point constants to single precision constants
 
+fsized-delete
+Common Report Var(flag_sized_delete) Optimization
+Support delete operator with objetc's size as the second parameter.
+
 fsplit-ivs-in-unroller
 Common Report Var(flag_split_ivs_in_unroller) Init(1) Optimization
 Split lifetimes of induction variables when loops are unrolled
@@ -1905,8 +1941,12 @@ fstack-protector
 Common Report Var(flag_stack_protect, 1)
 Use propolice as a stack protection method
 
-fstack-protector-all
+fstack-protector-strong
 Common Report RejectNegative Var(flag_stack_protect, 2)
+Use a smart stack protection method for certain functions
+
+fstack-protector-all
+Common Report RejectNegative Var(flag_stack_protect, 3)
 Use a stack protection method for every function
 
 fstack-usage

@@ -414,7 +414,7 @@ read_profile_edge_counts (gcov_type *exec_counts)
 		    if (flag_profile_correction)
 		      {
 			static bool informed = 0;
-			if (!informed)
+			if ((flag_opt_info >= OPT_INFO_MAX) && !informed)
 		          inform (input_location,
 			          "corrupted profile info: edge count exceeds maximal count");
 			informed = 1;
@@ -635,7 +635,7 @@ compute_branch_probabilities (unsigned cfg_checksum, unsigned lineno_checksum)
        {
          /* Inconsistency detected. Make it flow-consistent. */
          static int informed = 0;
-         if (informed == 0)
+         if ((flag_opt_info >= OPT_INFO_MAX) && informed == 0)
            {
              informed = 1;
              inform (input_location, "correcting inconsistent profile data");
@@ -790,9 +790,14 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
   gcov_type *histogram_counts[GCOV_N_VALUE_COUNTERS];
   gcov_type *act_count[GCOV_N_VALUE_COUNTERS];
   gcov_type *aact_count;
+  bool warned[GCOV_N_VALUE_COUNTERS];
+  static const char *const ctr_names[] = GCOV_COUNTER_NAMES;
 
   for (t = 0; t < GCOV_N_VALUE_COUNTERS; t++)
-    n_histogram_counters[t] = 0;
+    {
+      n_histogram_counters[t] = 0;
+      warned[t] = 0;
+    }
 
   for (i = 0; i < VEC_length (histogram_value, values); i++)
     {
@@ -828,6 +833,19 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
       t = (int) hist->type;
 
       aact_count = act_count[t];
+      /* If cannot find the counters in gcda file, skip and give
+         a warning.  */
+      if (aact_count == 0)
+        {    
+          if (!warned[t] && flag_opt_info >= OPT_INFO_MIN)
+            warning (0, "cannot find %s counters in function %s.",
+                     ctr_names[COUNTER_FOR_HIST_TYPE(t)],
+                     IDENTIFIER_POINTER (
+                       DECL_ASSEMBLER_NAME (current_function_decl)));
+          hist->n_counters = 0; 
+          warned[t] = true;
+          continue;
+        }    
       act_count[t] += hist->n_counters;
 
       gimple_add_histogram_value (cfun, stmt, hist);
