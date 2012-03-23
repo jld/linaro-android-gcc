@@ -82,7 +82,7 @@
 #undef  LIB_SPEC
 #define LIB_SPEC                                           \
   LINUX_OR_ANDROID_LD (LINUX_TARGET_LIB_SPEC,                  \
-                      LINUX_TARGET_LIB_SPEC " " ANDROID_LIB_SPEC)
+                      ANDROID_LIB_SPEC " " LINUX_TARGET_LIB_SPEC )
 
 #undef STARTFILE_SPEC
 #define STARTFILE_SPEC \
