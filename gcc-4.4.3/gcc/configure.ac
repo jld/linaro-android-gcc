@@ -3854,6 +3854,11 @@ AC_CACHE_CHECK(__stack_chk_fail in target C library,
 	     $glibc_header_dir/bits/uClibc_config.h > /dev/null; then
 	  gcc_cv_libc_provides_ssp=yes
 	fi
+      # all versions of Bionic support stack protector
+      elif test -f $glibc_header_dir/sys/cdefs.h \
+        && $EGREP '^[  ]*#[    ]*define[       ]+__BIONIC__[   ]+1' \
+           $glibc_header_dir/sys/cdefs.h > /dev/null; then
+         gcc_cv_libc_provides_ssp=yes
       fi
 	;;
        *-*-gnu*)

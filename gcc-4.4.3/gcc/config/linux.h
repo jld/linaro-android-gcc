@@ -169,4 +169,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 /* Whether we have sincos that follows the GNU extension.  */
 #define TARGET_HAS_SINCOS (OPTION_GLIBC)
 
+/* Whether we have Bionic libc runtime */
+#undef TARGET_HAS_BIONIC
+#define TARGET_HAS_BIONIC (OPTION_BIONIC)
+
 #define TARGET_POSIX_IO
