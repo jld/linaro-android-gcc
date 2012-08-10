@@ -3125,6 +3125,7 @@ ix86_target_string (int isa, int flags, const char *arch, const char *tune,
   static struct ix86_target_opts flag_opts[] =
   {
     { "-m128bit-long-double",		MASK_128BIT_LONG_DOUBLE },
+    { "-mlong-double-64",		MASK_LONG_DOUBLE_64 },
     { "-m80387",			MASK_80387 },
     { "-maccumulate-outgoing-args",	MASK_ACCUMULATE_OUTGOING_ARGS },
     { "-malign-double",			MASK_ALIGN_DOUBLE },
@@ -4292,7 +4293,13 @@ ix86_option_override_internal (bool main_args_p)
 #endif
    }
 
-  /* Save the initial options in case the user does function specific options */
+  /* Default long double to 64-bit for Bionic.  */
+  if (TARGET_HAS_BIONIC
+      && !(target_flags_explicit & MASK_LONG_DOUBLE_64))
+    target_flags |= MASK_LONG_DOUBLE_64;
+
+  /* Save the initial options in case the user does function specific
+     options.  */
   if (main_args_p)
     target_option_default_node = target_option_current_node
       = build_target_option_node ();
@@ -19419,7 +19426,9 @@ ix86_split_to_parts (rtx operand, rtx *parts, enum machine_mode mode)
 		  parts[2] = gen_int_mode (l[2], SImode);
 		  break;
 		case XFmode:
-		  REAL_VALUE_TO_TARGET_LONG_DOUBLE (r, l);
+		  /* We can't use REAL_VALUE_TO_TARGET_LONG_DOUBLE since
+		     long double may not be 80-bit.  */
+		  real_to_target (l, &r, mode);
 		  parts[2] = gen_int_mode (l[2], SImode);
 		  break;
 		case DFmode:

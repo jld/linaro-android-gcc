@@ -376,6 +376,9 @@ ix86_target_macros (void)
       builtin_define_std ("i386");
     }
 
+  if (TARGET_LONG_DOUBLE_64)
+    cpp_define (parse_in, "__LONG_DOUBLE_64__");
+
   ix86_target_macros_internal (ix86_isa_flags,
 			       ix86_arch,
 			       ix86_tune,
