@@ -23083,6 +23083,18 @@ arm_mangle_type (const_tree type)
   if (TARGET_AAPCS_BASED 
       && lang_hooks.types_compatible_p (CONST_CAST_TREE (type), va_list_type))
     {
+  /* Disable this obsolete warning for Android, because none of the exposed APIs
+     by NDK is impacted by this change of ARM ABI. This warning can be triggered
+     very easily by compiling the following code using arm-linux-androideabi-g++:
+
+         typedef __builtin_va_list __gnuc_va_list;
+         typedef __gnuc_va_list va_list;
+         void foo(va_list v) { }
+
+     We could advise developer to add "-Wno-psabi", but doing so also categorically
+     deny other cases guarded by "warn_psabi".  Hence the decision to disable it
+     case by case here.
+
       static bool warned;
       if (!warned && warn_psabi && !in_system_header)
 	{
@@ -23090,6 +23102,7 @@ arm_mangle_type (const_tree type)
 	  inform (input_location,
 		  "the mangling of %<va_list%> has changed in GCC 4.4");
 	}
+   */
       return "St9__va_list";
     }
 
