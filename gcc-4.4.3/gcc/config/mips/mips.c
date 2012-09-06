@@ -13345,7 +13345,10 @@ mips_reorg (void)
   if (mips_r10k_cache_barrier != R10K_CACHE_BARRIER_NONE)
     r10k_insert_cache_barriers ();
   if (optimize > 0 && flag_delayed_branch)
-    dbr_schedule (get_insns ());
+    {
+      cleanup_barriers ();
+      dbr_schedule (get_insns ());
+    }
   mips_reorg_process_insns ();
   if (!TARGET_MIPS16
       && TARGET_EXPLICIT_RELOCS
