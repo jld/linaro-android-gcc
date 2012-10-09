@@ -2086,6 +2086,9 @@ funwind-tables
 Common Report Var(flag_unwind_tables) Optimization
 Just generate unwind tables for exception handling
 
+fuse-ld=
+Common Joined Undocumented
+
 fuse-linker-plugin
 Common Undocumented
 
