@@ -46,8 +46,10 @@
 #include "gthr.h"
 
 #if !defined(inhibit_libc) && defined(HAVE_LD_EH_FRAME_HDR) \
-    && (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ > 2) \
-	|| (__GLIBC__ == 2 && __GLIBC_MINOR__ == 2 && defined(DT_CONFIG)))
+    && ((defined(__BIONIC__) && (defined(mips) || defined(__mips__))) \
+	|| (__GLIBC__ > 2 \
+	    || (__GLIBC__ == 2 && __GLIBC_MINOR__ > 2) \
+	    || (__GLIBC__ == 2 && __GLIBC_MINOR__ == 2 && defined(DT_CONFIG))))
 
 #include <link.h>
 
