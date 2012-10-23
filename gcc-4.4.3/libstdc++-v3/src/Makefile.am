@@ -206,7 +206,7 @@ libstdc___la_DEPENDENCIES = \
 	$(top_builddir)/libsupc++/libsupc++convenience.la
 
 libstdc___la_LDFLAGS = \
-	-version-info $(libtool_VERSION) ${version_arg} -lm 
+	-avoid-version ${version_arg} -lm
 
 # Use special rules for the deprecated source files so that they find
 # deprecated include files.
