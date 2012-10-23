@@ -72,15 +72,36 @@ along with GCC; see the file COPYING3.  If not see
 #define TARGET_OS_CPP_BUILTINS()		\
   do						\
     {						\
-	LINUX_TARGET_OS_CPP_BUILTINS();		\
+	    LINUX_TARGET_OS_CPP_BUILTINS();		\
+        ANDROID_TARGET_OS_CPP_BUILTINS();	\
     }						\
   while (0)
 
 #undef CPP_SPEC
 #define CPP_SPEC "%{posix:-D_POSIX_SOURCE} %{pthread:-D_REENTRANT}"
 
+#define OVERRIDE_LINUX_TARGET_CC1_SPEC "%(cc1_cpu) %{profile:-p}"
 #undef CC1_SPEC
-#define CC1_SPEC "%(cc1_cpu) %{profile:-p}"
+#define CC1_SPEC                                               \
+  LINUX_OR_ANDROID_CC (OVERRIDE_LINUX_TARGET_CC1_SPEC,                  \
+                       OVERRIDE_LINUX_TARGET_CC1_SPEC \
+                       " -march=i686 -mtune=atom" \
+                       " -mstackrealign -msse3 -mfpmath=sse" \
+                       " -m32 -fno-short-enums" \
+                       " " \
+                       ANDROID_CC1_SPEC("-fPIC"))
+
+#define CC1PLUS_SPEC \
+  LINUX_OR_ANDROID_CC ("", ANDROID_CC1PLUS_SPEC)
+
+#undef  LIB_SPEC
+#define LIB_SPEC                                           \
+  LINUX_OR_ANDROID_LD (LINUX_TARGET_LIB_SPEC,                  \
+                      LINUX_TARGET_LIB_SPEC " " ANDROID_LIB_SPEC)
+
+#undef STARTFILE_SPEC
+#define STARTFILE_SPEC \
+  LINUX_OR_ANDROID_LD (LINUX_TARGET_STARTFILE_SPEC, ANDROID_STARTFILE_SPEC)
 
 /* Provide a LINK_SPEC appropriate for Linux.  Here we provide support
    for the special GCC options -static and -shared, which allow us to
@@ -121,23 +142,28 @@ along with GCC; see the file COPYING3.  If not see
   { "link_emulation", LINK_EMULATION },\
   { "dynamic_linker", LINUX_DYNAMIC_LINKER }
 
-#undef	LINK_SPEC
-#define LINK_SPEC "-m %(link_emulation) %{shared:-shared} \
+#define OVERRIDE_LINUX_TARGET_LINK_SPEC "-m %(link_emulation) %{shared:-shared} \
   %{!shared: \
     %{!ibcs: \
       %{!static: \
 	%{rdynamic:-export-dynamic} \
 	%{!dynamic-linker:-dynamic-linker %(dynamic_linker)}} \
 	%{static:-static}}}"
+#undef	LINK_SPEC
+#define LINK_SPEC                                              \
+  LINUX_OR_ANDROID_LD (OVERRIDE_LINUX_TARGET_LINK_SPEC,                 \
+                      OVERRIDE_LINUX_TARGET_LINK_SPEC " " ANDROID_LINK_SPEC)
 
 /* Similar to standard Linux, but adding -ffast-math support.  */
-#undef  ENDFILE_SPEC
-#define ENDFILE_SPEC \
+#define OVERRIDE_LINUX_TARGET_ENDFILE_SPEC \
   "%{ffast-math|funsafe-math-optimizations:crtfastmath.o%s} \
    %{mpc32:crtprec32.o%s} \
    %{mpc64:crtprec64.o%s} \
    %{mpc80:crtprec80.o%s} \
    %{shared|pie:crtendS.o%s;:crtend.o%s} crtn.o%s"
+#undef  ENDFILE_SPEC
+#define ENDFILE_SPEC \
+  LINUX_OR_ANDROID_LD (OVERRIDE_LINUX_TARGET_ENDFILE_SPEC, ANDROID_ENDFILE_SPEC)
 
 /* A C statement (sans semicolon) to output to the stdio stream
    FILE the assembler definition of uninitialized global DECL named
