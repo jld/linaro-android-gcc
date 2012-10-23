@@ -74,7 +74,7 @@
 #undef  CC1_SPEC
 #define CC1_SPEC                                               \
   LINUX_OR_ANDROID_CC (LINUX_TARGET_CC1_SPEC,                  \
-                      LINUX_TARGET_CC1_SPEC " " ANDROID_CC1_SPEC)
+                      LINUX_TARGET_CC1_SPEC " " ANDROID_CC1_SPEC("-fpic"))
 
 #define CC1PLUS_SPEC \
   LINUX_OR_ANDROID_CC ("", ANDROID_CC1PLUS_SPEC)
