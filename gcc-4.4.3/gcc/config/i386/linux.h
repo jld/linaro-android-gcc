@@ -108,7 +108,8 @@ along with GCC; see the file COPYING3.  If not see
 #undef  ASM_SPEC
 #define ASM_SPEC \
   "%{v:-V} %{Qy:} %{!Qn:-Qy} %{n} %{T} %{Ym,*} %{Yd,*} %{Wa,*:%*} --32 \
-  %{!mno-sse2avx:%{mavx:-msse2avx}} %{msse2avx:%{!mavx:-msse2avx}}"
+  %{!mno-sse2avx:%{mavx:-msse2avx}} %{msse2avx:%{!mavx:-msse2avx}} " \
+  LINUX_OR_ANDROID_CC ("", ANDROID_ASM_SPEC)
 
 /* These may be provided by config/linux-grtev2.h.  */
 #ifndef LINUX_GRTE_EXTRA_SPECS
