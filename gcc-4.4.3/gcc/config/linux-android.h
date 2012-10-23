@@ -54,7 +54,7 @@
 
 #define ANDROID_STARTFILE_SPEC						\
   "%{!shared:"								\
-  "  %{static: crtbegin_static%O%s;: crtbegin_dynamic%O%s}}"
+  "  %{static: crtbegin_static%O%s;: crtbegin_dynamic%O%s};: crtbegin_so%O%s}"
 
 #define ANDROID_ENDFILE_SPEC \
-  "%{!shared: crtend_android%O%s}"
+  "%{!shared: crtend_android%O%s;: crtend_so%O%s}"
