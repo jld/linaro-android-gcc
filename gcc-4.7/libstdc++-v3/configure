@@ -607,6 +607,7 @@ WARN_FLAGS
 OPTIMIZE_CXXFLAGS
 TOPLEVEL_INCLUDES
 GLIBCXX_INCLUDES
+glibcxx_thread_h
 glibcxx_toolexeclibdir
 glibcxx_toolexecdir
 gxx_include_dir
@@ -15090,7 +15091,7 @@ $as_echo_n "checking for thread model used by GCC... " >&6; }
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: $target_thread_file" >&5
 $as_echo "$target_thread_file" >&6; }
 
-
+glibcxx_thread_h=gthr-$target_thread_file.h
 
   ac_ext=cpp
 ac_cpp='$CXXCPP $CPPFLAGS'
