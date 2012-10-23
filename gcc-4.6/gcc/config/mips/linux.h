@@ -44,6 +44,7 @@ along with GCC; see the file COPYING3.  If not see
     /* The GNU C++ standard library requires this.  */		\
     if (c_dialect_cxx ())					\
       builtin_define ("_GNU_SOURCE");				\
+    ANDROID_TARGET_OS_CPP_BUILTINS();				\
   } while (0)
 
 #undef SUBTARGET_CPP_SPEC
@@ -52,8 +53,8 @@ along with GCC; see the file COPYING3.  If not see
 /* A standard GNU/Linux mapping.  On most targets, it is included in
    CC1_SPEC itself by config/linux.h, but mips.h overrides CC1_SPEC
    and provides this hook instead.  */
-#undef SUBTARGET_CC1_SPEC
-#define SUBTARGET_CC1_SPEC "%{profile:-p}"
+#undef LINUX_SUBTARGET_CC1_SPEC
+#define LINUX_SUBTARGET_CC1_SPEC "%{profile:-p}"
 
 /* From iris5.h */
 /* -G is incompatible with -KPIC which is the default, so only allow objects
@@ -64,8 +65,8 @@ along with GCC; see the file COPYING3.  If not see
 #define GLIBC_DYNAMIC_LINKER "/lib/ld.so.1"
 
 /* Borrowed from sparc/linux.h */
-#undef LINK_SPEC
-#define LINK_SPEC \
+#undef LINUX_SUBTARGET_LINK_SPEC
+#define LINUX_SUBTARGET_LINK_SPEC \
  "%(endian_spec) \
   %{shared:-shared} \
   %{!shared: \
@@ -99,8 +100,8 @@ along with GCC; see the file COPYING3.  If not see
 #undef ASM_OUTPUT_REG_PUSH
 #undef ASM_OUTPUT_REG_POP
 
-#undef LIB_SPEC
-#define LIB_SPEC "\
+#undef LINUX_SUBTARGET_LIB_SPEC
+#define LINUX_SUBTARGET_LIB_SPEC "\
 %{pthread:-lpthread} \
 %{shared:-lc} \
 %{!shared: \
@@ -131,7 +132,7 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 #endif
 
 #define LINUX_DRIVER_SELF_SPECS \
-  NO_SHARED_SPECS							\
+  LINUX_OR_ANDROID_CC(NO_SHARED_SPECS, "")                              \
   MARCH_MTUNE_NATIVE_SPECS,						\
   /* -mplt has no effect without -mno-shared.  Simplify later		\
      specs handling by removing a redundant option.  */			\
@@ -145,7 +146,36 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
   LINUX_DRIVER_SELF_SPECS
 
 /* Similar to standard Linux, but adding -ffast-math support.  */
-#undef  ENDFILE_SPEC
-#define ENDFILE_SPEC \
-  "%{Ofast|ffast-math|funsafe-math-optimizations:crtfastmath.o%s} \
-   %{shared|pie:crtendS.o%s;:crtend.o%s} crtn.o%s"
+#undef  LINUX_TARGET_MATHFILE_SPEC
+#define LINUX_TARGET_MATHFILE_SPEC \
+  "%{Ofast|ffast-math|funsafe-math-optimizations:crtfastmath.o%s}"
+
+#undef  LINK_SPEC
+#define LINK_SPEC							\
+  LINUX_OR_ANDROID_LD (LINUX_SUBTARGET_LINK_SPEC,			\
+		       LINUX_SUBTARGET_LINK_SPEC " " ANDROID_LINK_SPEC)
+
+#undef  SUBTARGET_CC1_SPEC
+#define SUBTARGET_CC1_SPEC						\
+  LINUX_OR_ANDROID_CC (LINUX_SUBTARGET_CC1_SPEC,			\
+		       LINUX_SUBTARGET_CC1_SPEC " " ANDROID_CC1_SPEC("-fpic"))
+
+#undef  CC1PLUS_SPEC
+#define CC1PLUS_SPEC							\
+  LINUX_OR_ANDROID_CC ("", ANDROID_CC1PLUS_SPEC)
+
+#undef  LIB_SPEC
+#define LIB_SPEC							\
+  LINUX_OR_ANDROID_LD (LINUX_SUBTARGET_LIB_SPEC,			\
+		       LINUX_SUBTARGET_LIB_SPEC " " ANDROID_LIB_SPEC)
+
+#undef STARTFILE_SPEC
+#define STARTFILE_SPEC							\
+  LINUX_OR_ANDROID_LD (GNU_USER_TARGET_STARTFILE_SPEC, ANDROID_STARTFILE_SPEC)
+
+#undef ENDFILE_SPEC
+#define ENDFILE_SPEC							\
+  LINUX_OR_ANDROID_LD (LINUX_TARGET_MATHFILE_SPEC " "                  \
+                      GNU_USER_TARGET_ENDFILE_SPEC,                    \
+                      LINUX_TARGET_MATHFILE_SPEC " "                   \
+                      ANDROID_ENDFILE_SPEC)
