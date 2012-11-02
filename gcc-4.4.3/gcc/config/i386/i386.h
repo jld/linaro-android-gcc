@@ -2517,6 +2517,13 @@ struct machine_function GTY(())
 #undef TARG_COND_NOT_TAKEN_BRANCH_COST
 #define TARG_COND_NOT_TAKEN_BRANCH_COST ix86_cost->cond_not_taken_branch_cost
 
+enum stack_protector_guard {
+  SSP_TLS,      /* per-thread canary at %gs:20 */
+  SSP_GLOBAL,   /* global canary */
+};
+
+extern enum stack_protector_guard ix86_stack_protector_guard;
+
 /*
 Local variables:
 version-control: t

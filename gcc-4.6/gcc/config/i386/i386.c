@@ -2369,6 +2369,9 @@ static int ix86_regparm;
 static const char ix86_force_align_arg_pointer_string[]
   = "force_align_arg_pointer";
 
+/* Stack protector option.  */
+enum stack_protector_guard ix86_stack_protector_guard;
+
 static rtx (*ix86_gen_leave) (void);
 static rtx (*ix86_gen_add3) (rtx, rtx, rtx);
 static rtx (*ix86_gen_sub3) (rtx, rtx, rtx);
@@ -4359,6 +4362,22 @@ ix86_option_override_internal (bool main_args_p)
 	  varch = strtok (NULL, ",");
 	}
       free (token);
+    }
+
+  /* Handle stack protector */
+  if (ix86_stack_protector_guard_string != 0)
+    {
+      if (!strcmp (ix86_stack_protector_guard_string, "tls"))
+	ix86_stack_protector_guard = SSP_TLS;
+      else if (!strcmp (ix86_stack_protector_guard_string, "global"))
+	ix86_stack_protector_guard = SSP_GLOBAL;
+      else
+	error ("bad value (%s) for %sstack-protector-guard=%s %s",
+	       ix86_stack_protector_guard, prefix, suffix, sw);
+    }
+  else
+    {
+      ix86_stack_protector_guard = TARGET_HAS_BIONIC? SSP_GLOBAL : SSP_TLS;
     }
 }
 

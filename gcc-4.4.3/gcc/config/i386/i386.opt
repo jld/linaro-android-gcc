@@ -362,3 +362,7 @@ Support PCLMUL built-in functions and code generation
 msse2avx
 Target Report Var(ix86_sse2avx)
 Encode SSE instructions with VEX prefix
+
+mstack-protector-guard=
+Target RejectNegative Joined Var(ix86_stack_protector_guard_string)
+Use given stack-protector guard

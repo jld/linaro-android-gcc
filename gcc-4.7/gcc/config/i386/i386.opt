@@ -581,3 +581,18 @@ Split 32-byte AVX unaligned load
 mavx256-split-unaligned-store
 Target Report Mask(AVX256_SPLIT_UNALIGNED_STORE) Save
 Split 32-byte AVX unaligned store
+
+mstack-protector-guard=
+Target RejectNegative Joined Enum(stack_protector_guard) Var(ix86_stack_protector_guard) Init(SSP_TLS)
+Use given stack-protector guard
+
+Enum
+Name(stack_protector_guard) Type(enum stack_protector_guard)
+Known stack protector guard (for use with the -mstack-protector-guard= option):
+
+EnumValue
+Enum(stack_protector_guard) String(tls) Value(SSP_TLS)
+
+EnumValue
+Enum(stack_protector_guard) String(global) Value(SSP_GLOBAL)
+

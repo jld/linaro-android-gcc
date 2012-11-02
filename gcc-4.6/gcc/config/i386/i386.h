@@ -2378,6 +2378,12 @@ extern void debug_dispatch_window (int);
 #define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) \
 	((VALUE) = GET_MODE_BITSIZE (MODE), TARGET_BMI)
 
+enum stack_protector_guard {
+  SSP_TLS,      /* per-thread canary at %gs:20 */
+  SSP_GLOBAL,   /* global canary */
+};
+
+extern enum stack_protector_guard ix86_stack_protector_guard;
 
 /*
 Local variables:
