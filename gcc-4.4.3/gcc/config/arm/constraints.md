@@ -34,7 +34,7 @@
 ;; in Thumb-2 state: Ps, Pt, Pw, Px
 
 ;; The following memory constraints have been used:
-;; in ARM/Thumb-2 state: Q, Ut, Uv, Uy, Un, Us
+;; in ARM/Thumb-2 state: Q, Ut, Uv, Uy, Un, Um, Us
 ;; in ARM state: Uq
 
 
@@ -255,17 +255,24 @@
 
 (define_memory_constraint "Un"
  "@internal
+  In ARM/Thumb-2 state a valid address for Neon doubleword vector
+  load/store instructions."
+ (and (match_code "mem")
+      (match_test "TARGET_32BIT && neon_vector_mem_operand (op, 0)")))
+
+(define_memory_constraint "Um"
+ "@internal
   In ARM/Thumb-2 state a valid address for Neon element and structure
   load/store instructions."
  (and (match_code "mem")
-      (match_test "TARGET_32BIT && neon_vector_mem_operand (op, FALSE)")))
+      (match_test "TARGET_32BIT && neon_vector_mem_operand (op, 2)")))
 
 (define_memory_constraint "Us"
  "@internal
   In ARM/Thumb-2 state a valid address for non-offset loads/stores of
   quad-word values in four ARM registers."
  (and (match_code "mem")
-      (match_test "TARGET_32BIT && neon_vector_mem_operand (op, TRUE)")))
+      (match_test "TARGET_32BIT && neon_vector_mem_operand (op, 1)")))
 
 (define_memory_constraint "Uq"
  "@internal
