@@ -18526,8 +18526,8 @@ thumb_far_jump_used_p (void)
 
   /* In reload pass we haven't got the exact jump instruction length,
      but we can get a reasonable estimation based on the maximum
-     possible function length.  */
-  if (!reload_completed)
+     possible function length. */
+  if (optimize && !reload_completed)
     {
       int function_length = estimate_function_length();
       if (function_length < SHORTEST_FAR_JUMP_LENGTH)
