@@ -1,0 +1,4 @@
+http://gcc.gnu.org/viewcvs?view=revision&revision=193825
+2012-11-26  Diego Novillo  <dnovillo@google.com>
+
+    * gimplify.c: Work around for PR 55245.
