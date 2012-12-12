@@ -48,13 +48,35 @@ _GLIBCXX_BEGIN_NAMESPACE(std)
 
   template<typename _Tp>
     inline _Tp&&
-    forward(typename std::identity<_Tp>::type&& __t)
+    forward(typename std::remove_reference<_Tp>::type& __t)
+#ifdef __clang__
+    { return static_cast<_Tp&&>(__t); }
+#else
     { return __t; }
+#endif
+
+  template<typename _Tp>
+    inline _Tp&&
+    forward(typename std::remove_reference<_Tp>::type&& __t)
+    {
+#ifdef __clang__
+      static_assert(!std::is_lvalue_reference<_Tp>::value,
+                    "Can't instantiate this forward() with an"
+                    " lvalue reference type.");
+      return static_cast<_Tp&&>(__t);
+#else
+      return __t;
+#endif
+    }
 
   template<typename _Tp>
     inline typename std::remove_reference<_Tp>::type&&
     move(_Tp&& __t)
+#ifdef __clang__
+    { return static_cast<typename std::remove_reference<_Tp>::type&&>(__t); }
+#else
     { return __t; }
+#endif
 
 _GLIBCXX_END_NAMESPACE
 

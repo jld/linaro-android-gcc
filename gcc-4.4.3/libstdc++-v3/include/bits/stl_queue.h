@@ -249,7 +249,7 @@ _GLIBCXX_BEGIN_NAMESPACE(std)
 
 #ifdef __GXX_EXPERIMENTAL_CXX0X__
       void
-      swap(queue&& __q)
+      swap(queue& __q)
       { c.swap(__q.c); }
 #endif
     };
@@ -550,7 +550,7 @@ _GLIBCXX_BEGIN_NAMESPACE(std)
 
 #ifdef __GXX_EXPERIMENTAL_CXX0X__
       void
-      swap(priority_queue&& __pq)
+      swap(priority_queue& __pq)
       {
 	using std::swap;
 	c.swap(__pq.c);

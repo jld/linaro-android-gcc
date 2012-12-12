@@ -213,7 +213,7 @@ _GLIBCXX_BEGIN_NAMESPACE(std)
 
 #ifdef __GXX_EXPERIMENTAL_CXX0X__
       void
-      swap(stack&& __s)
+      swap(stack& __s)
       { c.swap(__s.c); }
 #endif
     };

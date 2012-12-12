@@ -715,11 +715,7 @@ _GLIBCXX_BEGIN_NAMESPACE(std)
       { return _M_get_Node_allocator().max_size(); }
 
       void
-#ifdef __GXX_EXPERIMENTAL_CXX0X__
-      swap(_Rb_tree&& __t);
-#else
       swap(_Rb_tree& __t);      
-#endif
 
       // Insert/erase.
       pair<iterator, bool>
@@ -1144,11 +1140,7 @@ _GLIBCXX_BEGIN_NAMESPACE(std)
            typename _Compare, typename _Alloc>
     void
     _Rb_tree<_Key, _Val, _KeyOfValue, _Compare, _Alloc>::
-#ifdef __GXX_EXPERIMENTAL_CXX0X__
-    swap(_Rb_tree<_Key, _Val, _KeyOfValue, _Compare, _Alloc>&& __t)
-#else
     swap(_Rb_tree<_Key, _Val, _KeyOfValue, _Compare, _Alloc>& __t)
-#endif
     {
       if (_M_root() == 0)
 	{

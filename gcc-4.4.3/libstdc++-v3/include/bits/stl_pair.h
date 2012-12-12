@@ -84,10 +84,21 @@ _GLIBCXX_BEGIN_NAMESPACE(std)
       : first(__a), second(__b) { }
 
 #ifdef __GXX_EXPERIMENTAL_CXX0X__
-      template<class _U1, class _U2>
+      template<class _U1, class = typename
+	       std::enable_if<std::is_convertible<_U1, _T1>::value>::type>
+	pair(_U1&& __x, const _T2& __y)
+	: first(std::forward<_U1>(__x)), second(__y) { }
+
+      template<class _U2, class = typename
+	       std::enable_if<std::is_convertible<_U2, _T2>::value>::type>
+	pair(const _T1& __x, _U2&& __y)
+	: first(__x), second(std::forward<_U2>(__y)) { }
+
+      template<class _U1, class _U2, class = typename
+	       std::enable_if<std::is_convertible<_U1, _T1>::value
+			      && std::is_convertible<_U2, _T2>::value>::type>
         pair(_U1&& __x, _U2&& __y)
-	: first(std::forward<_U1>(__x)),
-	  second(std::forward<_U2>(__y)) { }
+	: first(std::forward<_U1>(__x)), second(std::forward<_U2>(__y)) { }
 
       pair(pair&& __p)
       : first(std::move(__p.first)),
@@ -107,11 +118,19 @@ _GLIBCXX_BEGIN_NAMESPACE(std)
 	  second(std::move(__p.second)) { }
 
       // http://gcc.gnu.org/ml/libstdc++/2007-08/msg00052.html
+
+#if 0
+      // This constructor is incompatible with libstdc++-4.6, and it
+      // interferes with passing NULL pointers to the 2-argument
+      // constructors, so we disable it.  map::emplace isn't
+      // implemented in libstdc++-4.4 anyway, and that's what this
+      // constructor was here for.
       template<class _U1, class _Arg0, class... _Args>
         pair(_U1&& __x, _Arg0&& __arg0, _Args&&... __args)
 	: first(std::forward<_U1>(__x)),
 	  second(std::forward<_Arg0>(__arg0),
 		 std::forward<_Args>(__args)...) { }
+#endif
 
       pair&
       operator=(pair&& __p)
@@ -131,7 +150,7 @@ _GLIBCXX_BEGIN_NAMESPACE(std)
 	}
 
       void
-      swap(pair&& __p)
+      swap(pair& __p)
       {
 	using std::swap;
 	swap(first, __p.first);

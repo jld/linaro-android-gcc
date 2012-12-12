@@ -913,7 +913,7 @@ _GLIBCXX_BEGIN_NAMESPACE(std)
 
       reference
       operator*() const
-      { return *_M_current; }
+      { return std::move(*_M_current); }
 
       pointer
       operator->() const

@@ -983,7 +983,7 @@ _GLIBCXX_BEGIN_NAMESPACE(std)
        *  function.
        */
       void
-      swap(forward_list&& __list)
+      swap(forward_list& __list)
       { _Node_base::swap(this->_M_impl._M_head, __list._M_impl._M_head); }
 
       /**

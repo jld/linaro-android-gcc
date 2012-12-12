@@ -1106,11 +1106,7 @@ _GLIBCXX_BEGIN_NESTED_NAMESPACE(std, _GLIBCXX_STD_D)
        *  function.
        */
       void
-#ifdef __GXX_EXPERIMENTAL_CXX0X__
-      swap(list&& __x)
-#else
       swap(list& __x)
-#endif
       {
 	_List_node_base::swap(this->_M_impl._M_node, __x._M_impl._M_node);
 
@@ -1160,6 +1156,12 @@ _GLIBCXX_BEGIN_NESTED_NAMESPACE(std, _GLIBCXX_STD_D)
 	  }
       }
 
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+      void
+      splice(iterator __position, list& __x)
+      { splice(__position, std::move(__x)); }
+#endif
+
       /**
        *  @brief  Insert element from another %list.
        *  @param  position  Iterator referencing the element to insert before.
@@ -1186,6 +1188,12 @@ _GLIBCXX_BEGIN_NESTED_NAMESPACE(std, _GLIBCXX_STD_D)
 
 	this->_M_transfer(__position, __i, __j);
       }
+
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+      void
+      splice(iterator __position, list& __x, iterator __i)
+      { splice(__position, std::move(__x), __i); }
+#endif
 
       /**
        *  @brief  Insert range from another %list.
@@ -1216,6 +1224,13 @@ _GLIBCXX_BEGIN_NESTED_NAMESPACE(std, _GLIBCXX_STD_D)
 	    this->_M_transfer(__position, __first, __last);
 	  }
       }
+
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+      void
+      splice(iterator __position, list& __x, iterator __first,
+	     iterator __last)
+      { splice(__position, std::move(__x), __first, __last); }
+#endif
 
       /**
        *  @brief  Remove all elements equal to value.
@@ -1287,6 +1302,10 @@ _GLIBCXX_BEGIN_NESTED_NAMESPACE(std, _GLIBCXX_STD_D)
       void
 #ifdef __GXX_EXPERIMENTAL_CXX0X__
       merge(list&& __x);
+
+      void
+      merge(list& __x)
+      { merge(std::move(__x)); }
 #else
       merge(list& __x);
 #endif
@@ -1307,6 +1326,11 @@ _GLIBCXX_BEGIN_NESTED_NAMESPACE(std, _GLIBCXX_STD_D)
         void
 #ifdef __GXX_EXPERIMENTAL_CXX0X__
         merge(list&&, _StrictWeakOrdering);
+
+      template<typename _StrictWeakOrdering>
+        void
+        merge(list& __l, _StrictWeakOrdering __comp)
+        { merge(std::move(__l), __comp); }
 #else
         merge(list&, _StrictWeakOrdering);
 #endif
