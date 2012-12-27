@@ -106,11 +106,14 @@ along with GCC; see the file COPYING3.  If not see
 #undef ASM_OUTPUT_REG_POP
 
 #undef LINUX_SUBTARGET_LIB_SPEC
-#define LINUX_SUBTARGET_LIB_SPEC "\
-%{pthread:-lpthread} \
+#define LINUX_SUBTARGET_LIB_SPEC_LESS_PTHREAD "\
 %{shared:-lc} \
 %{!shared: \
   %{profile:-lc_p} %{!profile:-lc}}"
+
+#define LINUX_SUBTARGET_LIB_SPEC "\
+%{pthread:-lpthread} " \
+LINUX_SUBTARGET_LIB_SPEC_LESS_PTHREAD
 
 #define MD_UNWIND_SUPPORT "config/mips/linux-unwind.h"
 
@@ -167,7 +170,7 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 #undef  LIB_SPEC
 #define LIB_SPEC							\
   LINUX_OR_ANDROID_LD (LINUX_SUBTARGET_LIB_SPEC,			\
-		       LINUX_SUBTARGET_LIB_SPEC " " ANDROID_LIB_SPEC)
+		       LINUX_SUBTARGET_LIB_SPEC_LESS_PTHREAD " " ANDROID_LIB_SPEC)
 
 #undef STARTFILE_SPEC
 #define STARTFILE_SPEC							\

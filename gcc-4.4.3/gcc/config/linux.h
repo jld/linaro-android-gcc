@@ -79,10 +79,12 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #undef CPLUSPLUS_CPP_SPEC
 #define CPLUSPLUS_CPP_SPEC "-D_GNU_SOURCE %(cpp)"
 
-#define LINUX_TARGET_LIB_SPEC \
-  "%{pthread:-lpthread} \
-   %{shared:-lc} \
+#define LINUX_TARGET_LIB_SPEC_LESS_PTHREAD \
+   "%{shared:-lc} \
    %{!shared:%{mieee-fp:-lieee} %{profile:-lc_p}%{!profile:-lc}}"
+#define LINUX_TARGET_LIB_SPEC \
+  "%{pthread:-lpthread} " \
+  LINUX_TARGET_LIB_SPEC_LESS_PTHREAD
 #undef  LIB_SPEC
 #define LIB_SPEC LINUX_TARGET_LIB_SPEC
 

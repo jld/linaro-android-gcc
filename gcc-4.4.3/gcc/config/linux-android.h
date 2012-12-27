@@ -54,7 +54,7 @@
 
 #define ANDROID_LIB_SPEC \
   "%{!static: -ldl} \
-  %{pthread:-lc}"
+  %{pthread: -lc}"
 
 #define ANDROID_STARTFILE_SPEC						\
   "%{!shared:"								\

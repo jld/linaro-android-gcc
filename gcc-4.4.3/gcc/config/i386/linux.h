@@ -97,7 +97,7 @@ along with GCC; see the file COPYING3.  If not see
 #undef  LIB_SPEC
 #define LIB_SPEC                                           \
   LINUX_OR_ANDROID_LD (LINUX_TARGET_LIB_SPEC,                  \
-                      LINUX_TARGET_LIB_SPEC " " ANDROID_LIB_SPEC)
+                      LINUX_TARGET_LIB_SPEC_LESS_PTHREAD " " ANDROID_LIB_SPEC)
 
 #undef STARTFILE_SPEC
 #define STARTFILE_SPEC \
