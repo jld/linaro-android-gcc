@@ -19774,7 +19774,7 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 int
 main ()
 {
-#if _POSIX_TIMERS > 0 && (defined(_POSIX_MONOTONIC_CLOCK) || defined(__ANDROID__))
+#if _POSIX_TIMERS > 0 && defined(_POSIX_MONOTONIC_CLOCK)
 	  timespec tp;
 	 #endif
 	  clock_gettime(CLOCK_MONOTONIC, &tp);

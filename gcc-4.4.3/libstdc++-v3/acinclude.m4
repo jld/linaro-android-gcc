@@ -1162,7 +1162,7 @@ AC_DEFUN([GLIBCXX_ENABLE_LIBSTDCXX_TIME], [
         [#include <unistd.h>
          #include <time.h>
         ],
-        [#if _POSIX_TIMERS > 0 && (defined(_POSIX_MONOTONIC_CLOCK) || defined(__ANDROID__))
+        [#if _POSIX_TIMERS > 0 && defined(_POSIX_MONOTONIC_CLOCK)
           timespec tp;     
          #endif
           clock_gettime(CLOCK_MONOTONIC, &tp);
