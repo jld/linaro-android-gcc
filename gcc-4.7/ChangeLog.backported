@@ -24,3 +24,7 @@ http://gcc.gnu.org/viewcvs?view=revision&revision=186451
     * rtl.h (delete_insn, delete_insn_and_edges): Change return type to
     void.
     * cfglayout.c (fixup_reorder_chain): Delete unused label.
+
+2013-01-03  Jason Merrill  <jason@redhat.com>
+    PR c++/55856
+    * semantics.c (build_data_member_initialization): Handle DECL_EXPR.
