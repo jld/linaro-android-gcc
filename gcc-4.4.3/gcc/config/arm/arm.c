@@ -1375,11 +1375,8 @@ arm_override_options (void)
       target_flags &= ~MASK_THUMB;
     }
 
-  if (TARGET_APCS_FRAME && TARGET_THUMB)
-    {
-      /* warning (0, "ignoring -mapcs-frame because -mthumb was used"); */
-      target_flags &= ~MASK_APCS_FRAME;
-    }
+  if (TARGET_APCS_FRAME && TARGET_THUMB && !(insn_flags & FL_THUMB2))
+    error ("-mapcs-frame on Thumb1 is unimplemented");
 
   /* Callee super interworking implies thumb interworking.  Adding
      this to the flags here simplifies the logic elsewhere.  */
@@ -1414,7 +1411,7 @@ arm_override_options (void)
 
   /* If this target is normally configured to use APCS frames, warn if they
      are turned off and debugging is turned on.  */
-  if (TARGET_ARM
+  if (TARGET_32BIT
       && write_symbols != NO_DEBUG
       && !TARGET_APCS_FRAME
       && (TARGET_DEFAULT & MASK_APCS_FRAME))
@@ -12637,7 +12634,7 @@ static int arm_compute_static_chain_stack_bytes (void)
   unsigned long func_type = arm_current_func_type ();
   int static_chain_stack_bytes = 0;
 
-  if (TARGET_APCS_FRAME && frame_pointer_needed && TARGET_ARM &&
+  if (TARGET_APCS_FRAME && frame_pointer_needed && TARGET_32BIT &&
       IS_NESTED (func_type) &&
       df_regs_ever_live_p (3) && crtl->args.pretend_args_size == 0)
     static_chain_stack_bytes = 4;
@@ -12663,7 +12660,7 @@ arm_compute_save_reg_mask (void)
 
   /* If we are creating a stack frame, then we must save the frame pointer,
      IP (which will hold the old stack pointer), LR and the PC.  */
-  if (TARGET_APCS_FRAME && frame_pointer_needed && TARGET_ARM)
+  if (TARGET_APCS_FRAME && frame_pointer_needed && TARGET_32BIT)
     save_reg_mask |=
       (1 << ARM_HARD_FRAME_POINTER_REGNUM)
       | (1 << IP_REGNUM)
@@ -13216,7 +13213,7 @@ arm_output_epilogue (rtx sibling)
     if (saved_regs_mask & (1 << reg))
       floats_offset += 4;
 
-  if (TARGET_APCS_FRAME && frame_pointer_needed && TARGET_ARM)
+  if (TARGET_APCS_FRAME && frame_pointer_needed && TARGET_32BIT)
     {
       /* This variable is for the Virtual Frame Pointer, not VFP regs.  */
       int vfp_offset = offsets->frame;
@@ -14327,7 +14324,7 @@ arm_expand_prologue (void)
   /* For APCS frames, if IP register is clobbered
      when creating frame, save that register in a special
      way.  */
-  if (TARGET_APCS_FRAME && frame_pointer_needed && TARGET_ARM)
+  if (TARGET_APCS_FRAME && frame_pointer_needed && TARGET_32BIT)
     {
       if (IS_INTERRUPT (func_type))
 	{
@@ -14436,7 +14433,7 @@ arm_expand_prologue (void)
   if ((func_type == ARM_FT_ISR || func_type == ARM_FT_FIQ)
       && (live_regs_mask & (1 << LR_REGNUM)) != 0
       && !(frame_pointer_needed && TARGET_APCS_FRAME)
-      && TARGET_ARM)
+      && TARGET_32BIT)
     {
       rtx lr = gen_rtx_REG (SImode, LR_REGNUM);
       
@@ -14473,7 +14470,7 @@ arm_expand_prologue (void)
   if (! IS_VOLATILE (func_type))
     saved_regs += arm_save_coproc_regs ();
 
-  if (frame_pointer_needed && TARGET_ARM)
+  if (frame_pointer_needed && TARGET_32BIT)
     {
       /* Create the new frame pointer.  */
       if (TARGET_APCS_FRAME)
@@ -14534,7 +14531,7 @@ arm_expand_prologue (void)
     }
 
 
-  if (frame_pointer_needed && TARGET_THUMB2)
+  if (frame_pointer_needed && TARGET_THUMB2 && !TARGET_APCS_FRAME)
     thumb_set_frame_pointer (offsets);
 
   if (flag_pic && arm_pic_register != INVALID_REGNUM)

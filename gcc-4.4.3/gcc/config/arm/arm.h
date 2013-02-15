@@ -938,7 +938,7 @@ extern int arm_structure_size_boundary;
 #define THUMB_HARD_FRAME_POINTER_REGNUM	 7
 
 #define HARD_FRAME_POINTER_REGNUM		\
-  (TARGET_ARM					\
+  ((TARGET_ARM || TARGET_APCS_FRAME)		\
    ? ARM_HARD_FRAME_POINTER_REGNUM		\
    : THUMB_HARD_FRAME_POINTER_REGNUM)
 
@@ -1032,7 +1032,7 @@ extern int arm_structure_size_boundary;
 #define FRAME_POINTER_REQUIRED					\
   (cfun->has_nonlocal_label				\
    || SUBTARGET_FRAME_POINTER_REQUIRED				\
-   || (TARGET_ARM && TARGET_APCS_FRAME && ! leaf_function_p ()))
+   || (TARGET_32BIT && TARGET_APCS_FRAME && ! leaf_function_p ()))
 
 /* Return number of consecutive hard regs needed starting at reg REGNO
    to hold something of mode MODE.
@@ -1840,8 +1840,8 @@ typedef struct
 #define CAN_ELIMINATE(FROM, TO)						\
   (((TO) == FRAME_POINTER_REGNUM && (FROM) == ARG_POINTER_REGNUM) ? 0 :	\
    ((TO) == STACK_POINTER_REGNUM && frame_pointer_needed) ? 0 :		\
-   ((TO) == ARM_HARD_FRAME_POINTER_REGNUM && TARGET_THUMB) ? 0 :	\
-   ((TO) == THUMB_HARD_FRAME_POINTER_REGNUM && TARGET_ARM) ? 0 :	\
+   ((TO) == ARM_HARD_FRAME_POINTER_REGNUM && HARD_FRAME_POINTER_REGNUM != ARM_HARD_FRAME_POINTER_REGNUM) ? 0 : \
+   ((TO) == THUMB_HARD_FRAME_POINTER_REGNUM && HARD_FRAME_POINTER_REGNUM != THUMB_HARD_FRAME_POINTER_REGNUM) ? 0 : \
    1)
 
 /* Define the offset between two registers, one to be eliminated, and the
