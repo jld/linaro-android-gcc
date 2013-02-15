@@ -14433,7 +14433,7 @@ arm_expand_prologue (void)
   if ((func_type == ARM_FT_ISR || func_type == ARM_FT_FIQ)
       && (live_regs_mask & (1 << LR_REGNUM)) != 0
       && !(frame_pointer_needed && TARGET_APCS_FRAME)
-      && TARGET_32BIT)
+      && TARGET_ARM)
     {
       rtx lr = gen_rtx_REG (SImode, LR_REGNUM);
       
@@ -14470,7 +14470,7 @@ arm_expand_prologue (void)
   if (! IS_VOLATILE (func_type))
     saved_regs += arm_save_coproc_regs ();
 
-  if (frame_pointer_needed && TARGET_32BIT)
+  if (frame_pointer_needed && (TARGET_ARM || TARGET_APCS_FRAME))
     {
       /* Create the new frame pointer.  */
       if (TARGET_APCS_FRAME)
@@ -18825,7 +18825,9 @@ thumb_compute_initial_elimination_offset (unsigned int from, unsigned int to)
 	  return offsets->soft_frame - offsets->saved_args;
 
 	case ARM_HARD_FRAME_POINTER_REGNUM:
-	  return offsets->saved_regs - offsets->saved_args;
+	  return (TARGET_APCS_FRAME
+		  ? offsets->frame
+		  : offsets->saved_regs) - offsets->saved_args;
 
 	case THUMB_HARD_FRAME_POINTER_REGNUM:
 	  return offsets->locals_base - offsets->saved_args;
@@ -18842,7 +18844,9 @@ thumb_compute_initial_elimination_offset (unsigned int from, unsigned int to)
 	  return offsets->outgoing_args - offsets->soft_frame;
 
 	case ARM_HARD_FRAME_POINTER_REGNUM:
-	  return offsets->saved_regs - offsets->soft_frame;
+	  return (TARGET_APCS_FRAME
+		  ? offsets->frame
+		  : offsets->saved_regs) - offsets->soft_frame;
 
 	case THUMB_HARD_FRAME_POINTER_REGNUM:
 	  return offsets->locals_base - offsets->soft_frame;
