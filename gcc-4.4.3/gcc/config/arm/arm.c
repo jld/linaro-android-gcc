@@ -13347,10 +13347,23 @@ arm_output_epilogue (rtx sibling)
          occur.  If the stack pointer already points at the right
          place, then omit the subtraction.  */
       if (offsets->outgoing_args != (1 + (int) bit_count (saved_regs_mask))
-	  || cfun->calls_alloca)
-	asm_fprintf (f, "\tsub\t%r, %r, #%d\n", SP_REGNUM, FP_REGNUM,
-		     4 * bit_count (saved_regs_mask));
-      print_multi_reg (f, "ldmfd\t%r, ", SP_REGNUM, saved_regs_mask, 0);
+	  || cfun->calls_alloca) {
+	if (TARGET_ARM)
+	  asm_fprintf (f, "\tsub\t%r, %r, #%d\n", SP_REGNUM, FP_REGNUM,
+		       4 * bit_count (saved_regs_mask));
+	else {
+	  asm_fprintf (f, "\tsub\t%r, %r, #%d\n", IP_REGNUM, FP_REGNUM,
+		       4 * bit_count (saved_regs_mask));
+	}
+      }
+      if (TARGET_ARM) {
+	print_multi_reg (f, "ldmfd\t%r, ", SP_REGNUM, saved_regs_mask, 0);
+      } else {
+	// XXX jld: not restoring SP will probably break the caller
+	saved_regs_mask &= ~(1 << SP_REGNUM);
+	saved_regs_mask |= (1 << IP_REGNUM);
+	print_multi_reg (f, "ldmfd\t%r, ", IP_REGNUM, saved_regs_mask, 0);
+      }
 
       if (IS_INTERRUPT (func_type))
 	/* Interrupt handlers will have pushed the
