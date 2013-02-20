@@ -837,11 +837,12 @@ extern int arm_structure_size_boundary;
      is an easy way of ensuring that it remains valid for all	\
      calls.  */							\
   if (TARGET_APCS_FRAME || TARGET_CALLER_INTERWORKING		\
-      || TARGET_TPCS_FRAME || TARGET_TPCS_LEAF_FRAME)		\
+      || TARGET_TPCS_FRAME || TARGET_TPCS_LEAF_FRAME		\
+      || TARGET_THUMB2_FAKE_APCS_FRAME)				\
     {								\
       fixed_regs[ARM_HARD_FRAME_POINTER_REGNUM] = 1;		\
       call_used_regs[ARM_HARD_FRAME_POINTER_REGNUM] = 1;	\
-      if (TARGET_CALLER_INTERWORKING)				\
+      if (TARGET_CALLER_INTERWORKING || TARGET_THUMB2_FAKE_APCS_FRAME) \
 	global_regs[ARM_HARD_FRAME_POINTER_REGNUM] = 1;		\
     }								\
   SUBTARGET_CONDITIONAL_REGISTER_USAGE				\

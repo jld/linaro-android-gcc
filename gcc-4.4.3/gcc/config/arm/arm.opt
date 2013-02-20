@@ -37,6 +37,10 @@ mapcs-frame
 Target Report Mask(APCS_FRAME)
 Generate APCS conformant stack frames
 
+mthumb2-fake-apcs-frame
+Target Report Mask(THUMB2_FAKE_APCS_FRAME)
+Emulate APCS conformant stack frames in Thumb2 code
+
 mapcs-reentrant
 Target Report Mask(APCS_REENT)
 Generate re-entrant, PIC code

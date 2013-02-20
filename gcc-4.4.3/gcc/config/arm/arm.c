@@ -1381,6 +1381,21 @@ arm_override_options (void)
       target_flags &= ~MASK_APCS_FRAME;
     }
 
+  if (TARGET_THUMB2_FAKE_APCS_FRAME && !(insn_flags & FL_THUMB2))
+    {
+      warning (0, "ignoring -mthumb2-fake-apcs-frame for non-Thumb2 target");
+      target_flags &= ~MASK_THUMB2_FAKE_APCS_FRAME;
+    }
+
+  if (TARGET_THUMB2_FAKE_APCS_FRAME && TARGET_ARM)
+    {
+      target_flags &= ~MASK_THUMB2_FAKE_APCS_FRAME;
+      if (!TARGET_APCS_FRAME)
+	{
+	  warning (0, "-mthumb2-fake-apcs-frame but not -mapcs-frame specified when compiling for ARM");
+	}
+    }
+
   /* Callee super interworking implies thumb interworking.  Adding
      this to the flags here simplifies the logic elsewhere.  */
   if (TARGET_THUMB && TARGET_CALLEE_INTERWORKING)
@@ -12643,6 +12658,10 @@ arm_compute_save_reg_mask (void)
       | (1 << IP_REGNUM)
       | (1 << LR_REGNUM)
       | (1 << PC_REGNUM);
+  if (TARGET_THUMB2_FAKE_APCS_FRAME)
+    save_reg_mask |=
+      (1 << ARM_HARD_FRAME_POINTER_REGNUM)
+      | (1 << IP_REGNUM);
 
   /* Volatile functions do not return, so there
      is no need to save any other registers.  */
@@ -14480,6 +14499,13 @@ arm_expand_prologue (void)
 	  RTX_FRAME_RELATED_P (insn) = 1;
 	}
     }
+  else if (TARGET_THUMB2_FAKE_APCS_FRAME) {
+    rtx arm_fp_rtx = gen_raw_REG (Pmode, ARM_HARD_FRAME_POINTER_REGNUM);
+
+    insn = GEN_INT (saved_regs);
+    insn = emit_insn (gen_addsi3 (arm_fp_rtx, stack_pointer_rtx, insn));
+    RTX_FRAME_RELATED_P (insn) = 1;
+  }
 
   if (offsets->outgoing_args != offsets->saved_args + saved_regs)
     {
