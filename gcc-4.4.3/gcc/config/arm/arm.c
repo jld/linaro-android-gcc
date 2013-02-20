@@ -14504,7 +14504,8 @@ arm_expand_prologue (void)
 
     insn = GEN_INT (saved_regs);
     insn = emit_insn (gen_addsi3 (arm_fp_rtx, stack_pointer_rtx, insn));
-    RTX_FRAME_RELATED_P (insn) = 1;
+    /* This is not "frame-related", because it doesn't set the frame
+       pointer that a debugger would use to find things. */
   }
 
   if (offsets->outgoing_args != offsets->saved_args + saved_regs)
