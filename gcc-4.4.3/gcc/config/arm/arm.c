@@ -12658,10 +12658,6 @@ arm_compute_save_reg_mask (void)
       | (1 << IP_REGNUM)
       | (1 << LR_REGNUM)
       | (1 << PC_REGNUM);
-  if (TARGET_THUMB2_FAKE_APCS_FRAME)
-    save_reg_mask |=
-      (1 << ARM_HARD_FRAME_POINTER_REGNUM)
-      | (1 << IP_REGNUM);
 
   /* Volatile functions do not return, so there
      is no need to save any other registers.  */
@@ -12688,6 +12684,11 @@ arm_compute_save_reg_mask (void)
 
   if (cfun->machine->lr_save_eliminated)
     save_reg_mask &= ~ (1 << LR_REGNUM);
+
+  if (TARGET_THUMB2_FAKE_APCS_FRAME && (save_reg_mask & (1 << LR_REGNUM)))
+    save_reg_mask |=
+      (1 << ARM_HARD_FRAME_POINTER_REGNUM)
+      | (1 << IP_REGNUM);
 
   if (TARGET_REALLY_IWMMXT
       && ((bit_count (save_reg_mask)
@@ -14499,7 +14500,8 @@ arm_expand_prologue (void)
 	  RTX_FRAME_RELATED_P (insn) = 1;
 	}
     }
-  else if (TARGET_THUMB2_FAKE_APCS_FRAME) {
+  else if (TARGET_THUMB2_FAKE_APCS_FRAME &&
+	   (offsets->saved_regs_mask & (1 << ARM_HARD_FRAME_POINTER_REGNUM))) {
     rtx arm_fp_rtx = gen_raw_REG (Pmode, ARM_HARD_FRAME_POINTER_REGNUM);
 
     insn = GEN_INT (saved_regs);
